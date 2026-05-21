@@ -77,6 +77,9 @@ add_library(krisha_dsp STATIC
     ${PUBLIC_HEADERS}
 )
 
+# Enforce Position Independent Code (-fPIC) for shared library linkage
+set_target_properties(krisha_dsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 # Include directories
 target_include_directories(krisha_dsp
     PUBLIC
