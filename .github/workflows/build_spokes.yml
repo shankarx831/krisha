@@ -1,0 +1,82 @@
+name: Build Spokes
+
+on:
+  push:
+    branches: [ main, master, 'feature/**' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-spokes:
+    name: Build Spokes Matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup DSP Library Dependency
+        shell: bash
+        run: |
+          cd packages/dsp
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build .
+
+      - name: Build macOS HAL Driver
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd packages/driver
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build .
+
+      - name: Build Windows sAPO Spoke (MSVC)
+        if: matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          cd packages\spokes\windows
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="/D__attribute__(x)=" ..
+          cmake --build . --config Release
+
+      - name: Build Windows sAPO Spoke (Mocks on Unix)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          cd packages/spokes/windows
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build .
+
+      - name: Build Linux PipeWire Spoke
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          cd packages/spokes/linux
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build .
+
+      - name: Build Linux PipeWire Spoke (Mocks on macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          cd packages/spokes/linux
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build .
+
+      - name: Build Android JNI Spoke
+        shell: bash
+        run: |
+          cd packages/spokes/android
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build .

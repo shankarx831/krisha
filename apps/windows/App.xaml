@@ -1,0 +1,14 @@
+<Application
+    x:Class="RadioformSpoke.Windows.App"
+    xmlns="http://schemas.microsoft.com/winfx/2000/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2000/xaml"
+    ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <!-- Modern sleek system tray application styling resources -->
+        <ResourceDictionary>
+            <SolidColorBrush x:Key="NeonCyan" Color="#00E5E5"/>
+            <SolidColorBrush x:Key="NeonMagenta" Color="#FF0099"/>
+            <SolidColorBrush x:Key="GlassBg" Color="#1F1F1F"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

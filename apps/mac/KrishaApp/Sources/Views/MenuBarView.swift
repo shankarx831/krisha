@@ -1,0 +1,895 @@
+import SwiftUI
+
+// Cache font lookup once at launch
+private let radioformFont: Font = {
+    let size: CGFloat = 22
+    let possibleNames = [
+        "SignPainterHouseScript",
+        "SignPainter-HouseScript",
+        "SignPainter House Script",
+        "SignPainter"
+    ]
+    for name in possibleNames {
+        if NSFont(name: name, size: size) != nil {
+            return .custom(name, size: size)
+        }
+    }
+    return .system(size: size, weight: .bold)
+}()
+
+struct MenuBarView: View {
+    @ObservedObject private var presetManager = PresetManager.shared
+    @State private var showPresets = false
+
+    // AutoEq search state
+    @State private var searchQuery = ""
+    @State private var isDownloading = false
+    @State private var downloadingItemPath = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+                // Header with toggle only (no title)
+                HStack {
+                    Text("KRISHA")
+                        .font(radioformFont)
+                        
+                    Spacer()
+
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { presetManager.isEnabled },
+                            set: { newValue in
+                                if presetManager.isEnabled != newValue {
+                                    if newValue {
+                                        // Turning ON: if there's a preset selected, reapply it
+                                        if let preset = presetManager.currentPreset {
+                                            presetManager.isEnabled = true
+                                            presetManager.applyPreset(preset)
+                                        } else {
+                                            presetManager.toggleEnabled()
+                                        }
+                                    } else {
+                                        // Turning OFF: collapse dropdown and toggle
+                                        showPresets = false
+                                        presetManager.toggleEnabled()
+                                    }
+                                }
+                            }
+                        )
+                    )
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+
+                // Only show EQ controls and preset dropdown when enabled
+                if presetManager.isEnabled {
+                    // AutoEq search bar
+                    AutoEqSearchBar(
+                        searchQuery: $searchQuery,
+                        isDownloading: $isDownloading,
+                        downloadingItemPath: $downloadingItemPath,
+                        presetManager: presetManager
+                    )
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
+
+                    // Live EQ Graph View
+                    LiveEQGraph(presetManager: presetManager)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 6)
+
+                    // 10-Band EQ + Preamp
+                    TenBandEQ()
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+
+                    // Contextual area: band controls (focused) or presets (default)
+                    if let focusedIndex = presetManager.focusedBandIndex {
+                        if focusedIndex < 10 {
+                            // Per-band controls: filter type, frequency, Q factor
+                            BandControls(bandIndex: focusedIndex)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                        } else {
+                            // Preamp (index 10): limiter controls
+                            LimiterControls()
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                        }
+                    } else {
+                        // Default: preset dropdown
+                        PresetDropdown(isExpanded: $showPresets)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+
+                        // Preset list (animated expand/collapse)
+                        if showPresets {
+                            PresetList(
+                                presets: presetManager.allPresets.filter { $0.id != presetManager.currentPreset?.id },
+                                activeID: presetManager.currentPreset?.id,
+                                userPresetIDs: presetManager.userPresetIDs,
+                                onSelect: { preset in
+                                    presetManager.applyPreset(preset)
+                                    showPresets = false
+                                },
+                                onDelete: { preset in
+                                    do {
+                                        try presetManager.deletePreset(preset)
+                                        if preset.id == presetManager.currentPreset?.id {
+                                            presetManager.currentPreset = nil
+                                        }
+                                    } catch {
+                                        print("Failed to delete preset: \(error)")
+                                    }
+                                }
+                            )
+                            .padding(.horizontal, 8)
+                            .padding(.bottom, 6)
+                        }
+                    }
+                }
+
+                // Footer
+                QuitButton()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+        }
+        .frame(width: 340)
+        .fixedSize(horizontal: false, vertical: true)
+        .transaction { $0.animation = nil }
+    }
+}
+
+struct PresetDropdown: View {
+    @ObservedObject private var presetManager = PresetManager.shared
+    @Binding var isExpanded: Bool
+    @State private var isHovered = false
+    
+    // Editing state
+    @State private var editingName: String = ""
+    @State private var showSavedFeedback: Bool = false
+    @FocusState private var isNameFieldFocused: Bool
+    
+    // MARK: - Computed Properties
+    
+    /// True when a saved preset is selected and enabled
+    private var hasSelectedPreset: Bool {
+        presetManager.currentPreset != nil && presetManager.isEnabled
+    }
+    
+    /// True when user has modified EQ bands (custom unsaved state)
+    private var isCustomPreset: Bool {
+        presetManager.isCustomPreset && presetManager.isEnabled
+    }
+    
+    /// True when current preset is a user-created custom preset
+    private var isCurrentPresetCustom: Bool {
+        guard let currentPreset = presetManager.currentPreset else { return false }
+        return presetManager.userPresets.contains { $0.id == currentPreset.id }
+    }
+    
+    /// True when in editing mode
+    private var isEditing: Bool {
+        presetManager.isEditingPresetName
+    }
+    
+    /// Icon name: plus for unsaved custom, person.fill for saved custom preset, music.note for bundled preset
+    private var leftIconName: String {
+        if isCustomPreset {
+            return "plus"
+        } else if isCurrentPresetCustom {
+            return "person.fill"
+        } else {
+            return "music.note"
+        }
+    }
+    
+    /// Display name: "Double click to add preset" when custom, preset name otherwise
+    private var displayName: String {
+        if isCustomPreset {
+            return "Double click to add preset"
+        } else {
+            return presetManager.currentPreset?.name ?? PresetManager.customPresetName
+        }
+    }
+    
+    /// Check if current editing name is valid for saving
+    private var isValidPresetName: Bool {
+        presetManager.validatePresetName(editingName)
+    }
+    
+    /// Save button text based on state
+    private var saveButtonText: String {
+        if showSavedFeedback {
+            return "Saved"
+        } else if presetManager.isSavingPreset {
+            return "Saving..."
+        } else {
+            return "Save"
+        }
+    }
+    
+    /// Circle color: blue for saved preset, gray otherwise
+    private var circleColor: Color {
+        hasSelectedPreset ? Color.accentColor : Color(NSColor.separatorColor).opacity(0.5)
+    }
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            // Left element: Circle icon OR X button (when editing)
+            ZStack {
+                if isEditing {
+                    // X button to cancel editing
+                    Button {
+                        cancelEditing()
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color(NSColor.separatorColor).opacity(0.5))
+                                .frame(width: 28, height: 28)
+
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .transition(.scale.combined(with: .opacity))
+                } else {
+                    // Circle icon (music.note or plus)
+                    ZStack {
+                        Circle()
+                            .fill(circleColor)
+                            .frame(width: 28, height: 28)
+
+                        Image(systemName: leftIconName)
+                            .font(.system(size: 13, weight: .medium))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(hasSelectedPreset ? .white : .secondary)
+                    }
+                    .gesture(
+                        TapGesture()
+                            .onEnded {
+                                if isCustomPreset {
+                                    startEditing()
+                                }
+                            }
+                    )
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: isEditing)
+
+            // Text or TextField based on editing state
+            if isEditing {
+                TextField("Preset Name", text: $editingName)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(.primary)
+                    .focused($isNameFieldFocused)
+                    .onSubmit {
+                        if isValidPresetName {
+                            savePreset()
+                        }
+                    }
+                    .onExitCommand {
+                        cancelEditing()
+                    }
+                    .onChange(of: editingName) { newValue in
+                        // Limit to 64 characters
+                        if newValue.count > 64 {
+                            editingName = String(newValue.prefix(64))
+                        }
+                    }
+            } else {
+                // Text area - double tap enters editing (when custom), single tap handled by row
+                Text(displayName)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(isCustomPreset ? Color(NSColor.tertiaryLabelColor) : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .onTapGesture(count: 2) {
+                        if isCustomPreset {
+                            startEditing()
+                        }
+                    }
+            }
+
+            Spacer()
+
+            // Right element: Save button (when editing) OR chevron (when not editing)
+            if isEditing {
+                // Save button (rounded rectangle)
+                Button {
+                    if isValidPresetName && !presetManager.isSavingPreset {
+                        savePreset()
+                    }
+                } label: {
+                    Text(saveButtonText)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(isValidPresetName ? .white : Color(NSColor.tertiaryLabelColor))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(isValidPresetName ? Color.accentColor : Color(NSColor.separatorColor).opacity(0.5))
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isValidPresetName || presetManager.isSavingPreset)
+            } else {
+                // Chevron icon (not a button - tap handled by row)
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(Color(NSColor.tertiaryLabelColor))
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHovered ? Color(NSColor.separatorColor).opacity(0.5) : Color.clear)
+        )
+        .onTapGesture {
+            // Tapping anywhere on the row toggles dropdown (when not editing)
+            if !isEditing {
+                isExpanded.toggle()
+            }
+        }
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .onChange(of: isNameFieldFocused) { focused in
+            // Cancel editing if user clicks away
+            if !focused && isEditing && !presetManager.isSavingPreset && !showSavedFeedback {
+                cancelEditing()
+            }
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private func startEditing() {
+        editingName = ""
+        presetManager.isEditingPresetName = true
+        isExpanded = false
+        
+        // Delay focus to allow UI to update
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isNameFieldFocused = true
+        }
+    }
+    
+    private func cancelEditing() {
+        presetManager.isEditingPresetName = false
+        editingName = ""
+        isNameFieldFocused = false
+        showSavedFeedback = false
+    }
+    
+    private func savePreset() {
+        guard isValidPresetName else { return }
+        
+        Task {
+            presetManager.isSavingPreset = true
+            
+            do {
+                try await presetManager.saveCustomPreset(name: editingName)
+                presetManager.isSavingPreset = false
+                
+                // Show "Saved" feedback
+                showSavedFeedback = true
+                
+                // After brief delay, exit editing and show the new preset
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    showSavedFeedback = false
+                    presetManager.isEditingPresetName = false
+                    editingName = ""
+                    isNameFieldFocused = false
+                }
+            } catch {
+                presetManager.isSavingPreset = false
+                print("Failed to save preset: \(error)")
+            }
+        }
+    }
+}
+
+struct PresetList: View {
+    let presets: [EQPreset]
+    let activeID: EQPreset.ID?
+    let userPresetIDs: Set<EQPreset.ID>
+    let onSelect: (EQPreset) -> Void
+    let onDelete: (EQPreset) -> Void
+    
+    // Max items to show before scrolling (each item ~40px + 2px spacing)
+    private let maxVisibleItems = 13
+    private let estimatedItemHeight: CGFloat = 40
+    private let itemSpacing: CGFloat = 2
+    private var maxHeight: CGFloat {
+        CGFloat(maxVisibleItems) * estimatedItemHeight + CGFloat(maxVisibleItems - 1) * itemSpacing
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: itemSpacing) {
+                ForEach(presets) { preset in
+                    MenuItemButton(
+                        preset: preset,
+                        isActive: preset.id == activeID,
+                        isCustomPreset: userPresetIDs.contains(preset.id),
+                        onSelect: { onSelect(preset) },
+                        onDelete: onDelete
+                    )
+                }
+            }
+        }
+        .frame(maxHeight: presets.count > maxVisibleItems ? maxHeight : nil)
+    }
+}
+
+struct MenuItemButton: View {
+    let preset: EQPreset
+    let isActive: Bool
+    let isCustomPreset: Bool
+    let onSelect: () -> Void
+    let onDelete: (EQPreset) -> Void
+    @State private var isHovered = false
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        isActive
+                            ? Color.accentColor : Color(NSColor.separatorColor).opacity(0.4)
+                    )
+                    .frame(width: 28, height: 28)
+
+                Image(systemName: isCustomPreset ? "person.fill" : "music.note")
+                    .font(.system(size: 13, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(isActive ? .white : .secondary)
+            }
+
+            Text(preset.name)
+                .font(.system(size: 13))
+                .foregroundColor(.primary)
+
+            Spacer()
+            
+            // Delete button (X) - only show for custom presets on hover
+            if isCustomPreset && isHovered {
+                Button {
+                    onDelete(preset)
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(Color(NSColor.tertiaryLabelColor))
+                        .frame(width: 16, height: 16)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(isHovered ? Color(NSColor.separatorColor).opacity(0.5) : Color.clear)
+        )
+        .onTapGesture {
+            onSelect()
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+}
+
+// MARK: - Band Focus Controls
+
+struct BandControls: View {
+    let bandIndex: Int
+    @ObservedObject private var presetManager = PresetManager.shared
+    @State private var isEditingFreq = false
+    @State private var isEditingQ = false
+    @State private var freqText = ""
+    @State private var qText = ""
+    @FocusState private var freqFieldFocused: Bool
+    @FocusState private var qFieldFocused: Bool
+
+    /// Format frequency for display
+    private func formatFrequency(_ hz: Float) -> String {
+        if hz < 1000 {
+            return "\(Int(hz))"
+        } else if hz < 10000 {
+            return String(format: "%.1fK", hz / 1000)
+        } else {
+            return "\(Int(hz / 1000))K"
+        }
+    }
+
+    /// Parse user-entered frequency text (supports "1k", "1.5k", "250", etc.)
+    private func parseFrequency(_ text: String) -> Float? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces).lowercased()
+        if trimmed.hasSuffix("k") {
+            if let val = Float(trimmed.dropLast()) {
+                return val * 1000
+            }
+        }
+        return Float(trimmed)
+    }
+
+    /// Convert frequency (20–20000) to slider position (0–1) using log scale
+    private func freqToPosition(_ freq: Float) -> Double {
+        Double(log(freq / 20) / log(1000))
+    }
+
+    /// Convert slider position (0–1) to frequency (20–20000) using log scale
+    private func positionToFreq(_ position: Double) -> Float {
+        20 * pow(1000, Float(position))
+    }
+
+    private func commitFreq() {
+        if let hz = parseFrequency(freqText) {
+            presetManager.updateBandFrequency(index: bandIndex, frequencyHz: hz)
+        }
+        isEditingFreq = false
+    }
+
+    private func commitQ() {
+        if let q = Float(qText.trimmingCharacters(in: .whitespaces)) {
+            presetManager.updateBandQ(index: bandIndex, qFactor: q)
+        }
+        isEditingQ = false
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Filter
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: 16)
+
+                    Text("Filter")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.bottom, 2)
+
+                HStack(spacing: 4) {
+                    ForEach(FilterType.allCases, id: \.self) { type in
+                        let isSelected = presetManager.currentFilterTypes[bandIndex] == type
+                        Button {
+                            presetManager.updateBandFilterType(index: bandIndex, filterType: type)
+                        } label: {
+                            Text(type.shortDisplayName)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(isSelected ? .white : .primary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 3)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .fill(isSelected ? Color.accentColor : Color(NSColor.separatorColor).opacity(0.25))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            // Frequency
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: 16)
+
+                    Text("Frequency")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+
+                Slider(
+                    value: Binding(
+                        get: { freqToPosition(presetManager.currentFrequencies[bandIndex]) },
+                        set: { presetManager.updateBandFrequency(index: bandIndex, frequencyHz: positionToFreq($0)) }
+                    ),
+                    in: 0...1
+                )
+
+                if isEditingFreq {
+                    TextField("", text: $freqText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .frame(width: 60, alignment: .leading)
+                        .multilineTextAlignment(.leading)
+                        .focused($freqFieldFocused)
+                        .onSubmit { commitFreq() }
+                        .onExitCommand { isEditingFreq = false }
+                        .onChange(of: freqFieldFocused) { focused in
+                            if !focused { commitFreq() }
+                        }
+                } else {
+                    Text("\(formatFrequency(presetManager.currentFrequencies[bandIndex])) Hz")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.primary)
+                        .onTapGesture {
+                            freqText = formatFrequency(presetManager.currentFrequencies[bandIndex])
+                            isEditingFreq = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                freqFieldFocused = true
+                            }
+                        }
+                }
+            }
+
+            // Q
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: "tuningfork")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: 16)
+
+                    Text("Q")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+
+                Slider(
+                    value: Binding(
+                        get: { Double(presetManager.currentQFactors[bandIndex]) },
+                        set: { presetManager.updateBandQ(index: bandIndex, qFactor: Float($0)) }
+                    ),
+                    in: 0.1...10.0
+                )
+
+                if isEditingQ {
+                    TextField("", text: $qText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .frame(width: 60, alignment: .leading)
+                        .multilineTextAlignment(.leading)
+                        .focused($qFieldFocused)
+                        .onSubmit { commitQ() }
+                        .onExitCommand { isEditingQ = false }
+                        .onChange(of: qFieldFocused) { focused in
+                            if !focused { commitQ() }
+                        }
+                } else {
+                    Text(String(format: "%.2f", presetManager.currentQFactors[bandIndex]))
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.primary)
+                        .onTapGesture {
+                            qText = String(format: "%.2f", presetManager.currentQFactors[bandIndex])
+                            isEditingQ = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                qFieldFocused = true
+                            }
+                        }
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+    }
+}
+
+struct LimiterControls: View {
+    @ObservedObject private var presetManager = PresetManager.shared
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Toggle("", isOn: Binding(
+                get: { presetManager.currentLimiterEnabled },
+                set: { presetManager.updateLimiterEnabled($0) }
+            ))
+            .toggleStyle(.switch)
+            .labelsHidden()
+            .controlSize(.small)
+
+            Text("Limiter")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(String(format: "%.1f dB", presetManager.currentLimiterThresholdDb))
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundColor(.secondary)
+                .frame(width: 50, alignment: .trailing)
+
+            Slider(
+                value: Binding(
+                    get: { Double(presetManager.currentLimiterThresholdDb) },
+                    set: { presetManager.updateLimiterThreshold(db: Float($0)) }
+                ),
+                in: -6.0...0.0
+            )
+            .frame(width: 100)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+    }
+}
+
+struct QuitButton: View {
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: {
+            NSApp.terminate(nil)
+        }) {
+            Text("Quit KRISHA")
+                .font(.system(size: 11, weight: .regular))
+                .foregroundColor(isHovered ? .white : .primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isHovered ? Color.accentColor : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+}
+
+// MARK: - AutoEq SearchBar Integration
+
+struct AutoEqSearchBar: View {
+    @Binding var searchQuery: String
+    @ObservedObject var autoEq = AutoEqService.shared
+    @Binding var isDownloading: Bool
+    @Binding var downloadingItemPath: String
+    @ObservedObject var presetManager: PresetManager
+    @FocusState private var isFieldFocused: Bool
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.5))
+
+                TextField("Search AutoEq (e.g. Sennheiser HD 600)...", text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                    .foregroundColor(.white)
+                    .focused($isFieldFocused)
+                    .onChange(of: searchQuery) { newValue in
+                        autoEq.search(query: newValue)
+                    }
+
+                if !searchQuery.isEmpty {
+                    Button {
+                        searchQuery = ""
+                        autoEq.searchResults = []
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+            )
+            .onAppear {
+                if !autoEq.indexLoaded && !autoEq.isIndexing {
+                    Task {
+                        await autoEq.fetchAndIndex()
+                    }
+                }
+            }
+
+            if autoEq.isIndexing {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.6)
+                    Text("Indexing AutoEq database...")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                .padding(.vertical, 2)
+            }
+
+            if !autoEq.searchResults.isEmpty && !searchQuery.isEmpty {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(autoEq.searchResults) { item in
+                        Button {
+                            downloadAndApply(item: item)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.name)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(.white)
+                                    Text(item.source)
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.white.opacity(0.5))
+                                }
+                                Spacer()
+                                if isDownloading && downloadingItemPath == item.path {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .scaleEffect(0.6)
+                                } else {
+                                    Image(systemName: "arrow.down.circle")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.4))
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(AutoEqRowButtonStyle())
+                    }
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.black.opacity(0.85))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                        )
+                )
+                .transition(.opacity)
+                .zIndex(100)
+            }
+        }
+    }
+
+    private func downloadAndApply(item: AutoEqItem) {
+        guard !isDownloading else { return }
+        isDownloading = true
+        downloadingItemPath = item.path
+
+        Task {
+            if let preset = await autoEq.downloadPreset(for: item) {
+                await MainActor.run {
+                    presetManager.applyPreset(preset)
+                    // Clear search to collapse results
+                    searchQuery = ""
+                    autoEq.searchResults = []
+                }
+            }
+            await MainActor.run {
+                isDownloading = false
+                downloadingItemPath = ""
+            }
+        }
+    }
+}
+
+struct AutoEqRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? Color.white.opacity(0.15) : Color.clear)
+    }
+}

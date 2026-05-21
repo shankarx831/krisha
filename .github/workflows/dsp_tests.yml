@@ -1,0 +1,52 @@
+name: DSP Unit Tests
+
+on:
+  push:
+    branches: [ main, master, 'feature/**' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  run-tests:
+    name: Run DSP Unit Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install CMake & Build Tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+
+      - name: Setup CMake Cache
+        uses: actions/cache@v4
+        with:
+          path: packages/dsp/build
+          key: ${{ runner.os }}-cmake-dsp-${{ hashFiles('packages/dsp/CMakeLists.txt', 'packages/dsp/src/**', 'packages/dsp/tests/**') }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-dsp-
+
+      - name: Configure CMake
+        run: |
+          cd packages/dsp
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON ..
+
+      - name: Build DSP Library and Tests
+        run: |
+          cd packages/dsp/build
+          cmake --build . --parallel $(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+
+      - name: Execute DSP Unit Test Suite
+        run: |
+          cd packages/dsp/build
+          ./tests/radioform_dsp_tests
