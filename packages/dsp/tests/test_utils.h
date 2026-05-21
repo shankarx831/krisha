@@ -17,6 +17,15 @@
 #include <functional>
 #include <type_traits>
 
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
+#endif
+#include <cmath>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 template <typename T, typename U>
 inline bool safe_compare_eq(const T& a, const U& b) {
     if constexpr (std::is_integral_v<T> && std::is_integral_v<U>) {
