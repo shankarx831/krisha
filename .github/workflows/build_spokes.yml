@@ -27,7 +27,7 @@ jobs:
           cd packages/dsp
           mkdir -p build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
-          cmake --build .
+          cmake --build . --config Release
 
       - name: Build macOS HAL Driver
         if: matrix.os == 'macos-latest'
@@ -35,7 +35,7 @@ jobs:
           cd packages/driver
           mkdir -p build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
-          cmake --build .
+          cmake --build . --config Release
 
       - name: Build Windows sAPO Spoke (MSVC)
         if: matrix.os == 'windows-latest'
@@ -54,7 +54,7 @@ jobs:
           cd packages/spokes/windows
           mkdir -p build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
-          cmake --build .
+          cmake --build . --config Release
 
       - name: Build Linux PipeWire Spoke
         if: matrix.os == 'ubuntu-latest'
@@ -63,7 +63,7 @@ jobs:
           cd packages/spokes/linux
           mkdir -p build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
-          cmake --build .
+          cmake --build . --config Release
 
       - name: Build Linux PipeWire Spoke (Mocks on macOS)
         if: matrix.os == 'macos-latest'
@@ -72,7 +72,7 @@ jobs:
           cd packages/spokes/linux
           mkdir -p build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
-          cmake --build .
+          cmake --build . --config Release
 
       - name: Build Android JNI Spoke
         shell: bash
@@ -80,4 +80,4 @@ jobs:
           cd packages/spokes/android
           mkdir -p build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
-          cmake --build .
+          cmake --build . --config Release
