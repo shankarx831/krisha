@@ -18,6 +18,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           submodules: true
       - name: Configure DSP
         run: cmake -S packages/dsp -B packages/dsp/build -DCMAKE_BUILD_TYPE=Release
@@ -36,6 +37,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           submodules: true
       - name: Build DSP dependency (universal)
         run: |
@@ -89,6 +91,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
