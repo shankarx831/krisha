@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=KRISHA Universal
+Comment=Kernel-level Reactive Parametric Equalizer Suite
+Exec=/usr/bin/krisha-ui
+Icon=krisha
+Terminal=false
+Categories=AudioVideo;Audio;Mixer;
+StartupNotify=true

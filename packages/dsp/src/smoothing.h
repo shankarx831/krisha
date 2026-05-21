@@ -1,15 +1,19 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file smoothing.h
  * @brief Parameter smoothing to prevent zipper noise
  */
 
-#ifndef RADIOFORM_SMOOTHING_H
-#define RADIOFORM_SMOOTHING_H
+#ifndef KRISHA_SMOOTHING_H
+#define KRISHA_SMOOTHING_H
 
 #include <cstdint>
 #include <cmath>
 
-namespace radioform {
+namespace krisha {
 
 /**
  * @brief Parameter smoother with velocity-assisted exponential response
@@ -136,6 +140,6 @@ inline float gain_to_db(float gain) {
     return 20.0f * std::log10(gain);
 }
 
-} // namespace radioform
+} // namespace krisha
 
-#endif // RADIOFORM_SMOOTHING_H
+#endif // KRISHA_SMOOTHING_H

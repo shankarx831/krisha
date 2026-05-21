@@ -1,0 +1,5 @@
+module CKrishaAudio {
+    header "RFSharedAudio.h"
+    header "RFSharedMemoryWrapper.h"
+    export *
+}

@@ -248,7 +248,7 @@ private struct SkeuomorphicEnvelopeView: View {
                     .font(typewriterFont(size: 13))
                     .foregroundColor(textColor)
 
-                Text("SUBJECT: RADIOFORM")
+                Text("SUBJECT: KRISHA")
                     .font(typewriterFont(size: 13))
                     .foregroundColor(textColor)
                     .padding(.top, 12)
@@ -258,7 +258,7 @@ private struct SkeuomorphicEnvelopeView: View {
             .padding(.leading, 32)
 
             // Top-right: Stamp
-            if let stampImage = loadImage(named: "RadioformTopRight") {
+            if let stampImage = loadImage(named: "KrishaTopRight") {
                 Image(nsImage: stampImage)
                     .resizable()
                     .scaledToFit()
@@ -269,7 +269,7 @@ private struct SkeuomorphicEnvelopeView: View {
             }
 
             // Bottom-left: Logo
-            if let logoImage = loadImage(named: "RadioformBottomRight") {
+            if let logoImage = loadImage(named: "KrishaBottomRight") {
                 Image(nsImage: logoImage)
                     .resizable()
                     .scaledToFit()
@@ -298,8 +298,8 @@ private struct SkeuomorphicEnvelopeView: View {
             .frame(width: width, height: height)
             .zIndex(2)  // Flap on top
 
-            // RADIOFORM text at bottom center
-            Text("RADIOFORM")
+            // KRISHA text at bottom center
+            Text("KRISHA")
                 .font(.system(size: 10, weight: .regular, design: .monospaced))
                 .foregroundColor(textColor.opacity(0.5))
                 .tracking(3)
@@ -365,7 +365,7 @@ private struct SkeuomorphicEnvelopeView: View {
             // Title section - same VStack wrapper for consistent positioning
             VStack(alignment: .leading, spacing: 8) {
                 if installer.state.isComplete {
-                    Text("Select Radioform from your\nsounds in settings")
+                    Text("Select Krisha from your\nsounds in settings")
                         .font(.system(size: 20, weight: .medium))
                         .foregroundColor(.primary)
                         .lineSpacing(4)
@@ -404,7 +404,7 @@ private struct SkeuomorphicEnvelopeView: View {
                 Button(action: {
                     onComplete()
                 }) {
-                    Text("Open Radioform →")
+                    Text("Open Krisha →")
                         .underline()
                         .foregroundColor(.primary)
                 }
@@ -412,7 +412,7 @@ private struct SkeuomorphicEnvelopeView: View {
                 .buttonStyle(.plain)
             } else {
                 // Pre-install / installing
-                Text("This enables Radioform to process your system audio")
+                Text("This enables Krisha to process your system audio")
                     .font(.system(size: 14))
                     .foregroundColor(.secondary)
 

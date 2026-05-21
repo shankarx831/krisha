@@ -1,6 +1,6 @@
 import Foundation
 
-/// Complete EQ preset matching radioform_preset_t
+/// Complete EQ preset matching krisha_preset_t
 struct EQPreset: Codable, Identifiable, Equatable {
     let id = UUID()
     var name: String                    // Max 64 chars

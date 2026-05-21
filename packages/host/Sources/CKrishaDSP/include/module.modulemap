@@ -1,0 +1,6 @@
+module CKrishaDSP {
+    header "krisha_types.h"
+    header "krisha_dsp.h"
+    header "krisha_universal.h"
+    export *
+}

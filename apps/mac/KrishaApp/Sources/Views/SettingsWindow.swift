@@ -137,20 +137,55 @@ struct SettingsView: View {
 								.font(.caption)
 								.foregroundColor(.secondary)
 
-							Link("View on GitHub", destination: URL(string: "https://github.com/Torteous44/radioform")!)
+							Link("View on GitHub", destination: URL(string: "https://github.com/Torteous44/krisha")!)
 								.font(.caption)
 						}
 					}
 					.padding(16)
 					.background(Color.secondary.opacity(0.05))
 					.cornerRadius(12)
+
+					// Destructive Panic Button Section
+					VStack(alignment: .leading, spacing: 16) {
+						Text("Safety & Failsafes")
+							.font(.headline)
+							.foregroundColor(.primary)
+
+						Button(role: .destructive, action: uninstallAudioDriver) {
+							HStack {
+								Image(systemName: "exclamationmark.shield.fill")
+								Text("Uninstall Audio Driver (Panic Button)")
+							}
+							.frame(maxWidth: .infinity)
+						}
+						.controlSize(.large)
+					}
+					.padding(16)
+					.background(Color.red.opacity(0.1))
+					.cornerRadius(12)
 				}
 				.padding(20)
 			}
 		}
-		.frame(width: 500, height: 450)
+		.frame(width: 500, height: 480)
 		.onAppear {
 			automaticCheckEnabled = updaterController?.updater.automaticallyChecksForUpdates ?? true
+		}
+	}
+
+	private func uninstallAudioDriver() {
+		let script = """
+		do shell script "rm -rf /Library/Audio/Plug-Ins/HAL/KrishaDriver.driver && rm -rf /Library/Audio/Plug-Ins/HAL/KrishaDriver.driver && launchctl kickstart -kp system/com.apple.audio.coreaudiod" with administrator privileges
+		"""
+		DispatchQueue.global(qos: .userInitiated).async {
+			let appleScript = NSAppleScript(source: script)
+			var errorDict: NSDictionary?
+			appleScript?.executeAndReturnError(&errorDict)
+			if let error = errorDict {
+				print("Uninstall error: \(error)")
+			} else {
+				print("Uninstall successful")
+			}
 		}
 	}
 

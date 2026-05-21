@@ -1,10 +1,14 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file cpu_util.h
  * @brief CPU-specific utilities and optimizations
  */
 
-#ifndef RADIOFORM_CPU_UTIL_H
-#define RADIOFORM_CPU_UTIL_H
+#ifndef KRISHA_CPU_UTIL_H
+#define KRISHA_CPU_UTIL_H
 
 #include <cstdint>
 
@@ -14,7 +18,7 @@
     #include <pmmintrin.h>  // SSE3 for DAZ
 #endif
 
-namespace radioform {
+namespace krisha {
 
 /**
  * @brief Enable denormal (subnormal) suppression for performance
@@ -92,6 +96,6 @@ inline float denormal_offset(float value) {
     return value + offset;
 }
 
-} // namespace radioform
+} // namespace krisha
 
-#endif // RADIOFORM_CPU_UTIL_H
+#endif // KRISHA_CPU_UTIL_H

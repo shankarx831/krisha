@@ -1,3 +1,3 @@
 # `apps/mac`
 
-macOS application layer for Radioform.
+macOS application layer for Krisha.

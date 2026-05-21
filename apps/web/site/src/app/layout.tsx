@@ -10,11 +10,11 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://radioform.app"),
-  title: "Radioform: A macOS EQ App",
+  metadataBase: new URL("https://krisha.app"),
+  title: "Krisha: A macOS EQ App",
   description:
-    "Radioform is an open source macOS EQ app that lives in your menubar.",
-  applicationName: "Radioform",
+    "Krisha is an open source macOS EQ app that lives in your menubar.",
+  applicationName: "Krisha",
   keywords: [
     "macOS equalizer",
     "mac EQ app",
@@ -40,11 +40,11 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
   },
   openGraph: {
-    title: "Radioform: A macOS EQ App",
+    title: "Krisha: A macOS EQ App",
     description:
-      "Radioform is an open source macOS EQ app that lives in your menubar.",
-    url: "https://radioform.app",
-    siteName: "Radioform",
+      "Krisha is an open source macOS EQ app that lives in your menubar.",
+    url: "https://krisha.app",
+    siteName: "Krisha",
     type: "website",
     locale: "en_US",
     images: [
@@ -52,15 +52,15 @@ export const metadata: Metadata = {
         url: "/socialpreview.png",
         width: 1200,
         height: 630,
-        alt: "Radioform: A macOS EQ App",
+        alt: "Krisha: A macOS EQ App",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Radioform: A macOS EQ App",
+    title: "Krisha: A macOS EQ App",
     description:
-      "Radioform is an open source macOS EQ app that lives in your menubar.",
+      "Krisha is an open source macOS EQ app that lives in your menubar.",
     images: ["/socialpreview.png"],
   },
   robots: {

@@ -1,13 +1,17 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file engine.cpp
  * @brief Main DSP engine implementation
  *
- * Implements the public C API defined in radioform_dsp.h and radioform_universal.h.
+ * Implements the public C API defined in krisha_dsp.h and krisha_universal.h.
  * The engine is self-contained and does not require external DSP libraries.
  */
 
-#include "radioform_dsp.h"
-#include "radioform_universal.h"
+#include "krisha_dsp.h"
+#include "krisha_universal.h"
 #include "biquad.h"
 #include "smoothing.h"
 #include "limiter.h"
@@ -20,25 +24,25 @@
 #include <array>
 #include <chrono>
 
-using namespace radioform;
+using namespace krisha;
 
 // ============================================================================
 // Engine Internal Structure
 // ============================================================================
 
-struct radioform_dsp_engine {
+struct krisha_dsp_engine {
     // Sample rate
     uint32_t sample_rate;
 
     // EQ bands (each biquad handles stereo)
-    std::array<Biquad, RADIOFORM_MAX_BANDS> bands;
+    std::array<Biquad, KRISHA_MAX_BANDS> bands;
     uint32_t num_active_bands;
 
     // Current preset configuration
-    radioform_preset_t current_preset;
+    krisha_preset_t current_preset;
 
     // Precomputed effective active bands (0dB bypassed filters are excluded)
-    std::array<uint32_t, RADIOFORM_MAX_BANDS> active_band_indices;
+    std::array<uint32_t, KRISHA_MAX_BANDS> active_band_indices;
     uint32_t num_effective_bands;
 
     // Parameter smoothing for independent channels
@@ -71,9 +75,9 @@ struct radioform_dsp_engine {
         for (uint32_t i = 0; i < current_preset.num_bands; i++) {
             const auto& band = current_preset.bands[i];
             if (band.enabled) {
-                bool is_gain_filter = (band.type == RADIOFORM_FILTER_PEAK ||
-                                       band.type == RADIOFORM_FILTER_LOW_SHELF ||
-                                       band.type == RADIOFORM_FILTER_HIGH_SHELF);
+                bool is_gain_filter = (band.type == KRISHA_FILTER_PEAK ||
+                                       band.type == KRISHA_FILTER_LOW_SHELF ||
+                                       band.type == KRISHA_FILTER_HIGH_SHELF);
                 // Bypass mathematically when gain is 0dB, provided we are not in the middle of coefficient smoothing
                 if (is_gain_filter && std::abs(band.gain_db) < 1e-5f && !bands[i].isTransitioning()) {
                     continue;
@@ -84,7 +88,7 @@ struct radioform_dsp_engine {
     }
 
     // Constructor
-    radioform_dsp_engine(uint32_t sr)
+    krisha_dsp_engine(uint32_t sr)
         : sample_rate(sr)
         , num_active_bands(0)
         , num_effective_bands(0)
@@ -100,7 +104,7 @@ struct radioform_dsp_engine {
         enable_denormal_suppression();
 
         // Initialize with flat preset
-        radioform_dsp_preset_init_flat(&current_preset);
+        krisha_dsp_preset_init_flat(&current_preset);
 
         // Initialize all biquads
         for (auto& bq : bands) {
@@ -131,25 +135,25 @@ struct radioform_dsp_engine {
 // Engine Lifecycle
 // ============================================================================
 
-radioform_dsp_engine_t* radioform_dsp_create(uint32_t sample_rate) {
+krisha_dsp_engine_t* krisha_dsp_create(uint32_t sample_rate) {
     if (sample_rate < 8000 || sample_rate > 384000) {
         return nullptr; // Invalid sample rate
     }
 
     try {
-        return new radioform_dsp_engine(sample_rate);
+        return new krisha_dsp_engine(sample_rate);
     } catch (...) {
         return nullptr;
     }
 }
 
-void radioform_dsp_destroy(radioform_dsp_engine_t* engine) {
+void krisha_dsp_destroy(krisha_dsp_engine_t* engine) {
     if (engine) {
         delete engine;
     }
 }
 
-void radioform_dsp_reset(radioform_dsp_engine_t* engine) {
+void krisha_dsp_reset(krisha_dsp_engine_t* engine) {
     if (!engine) return;
 
     // Reset all filter state
@@ -165,13 +169,13 @@ void radioform_dsp_reset(radioform_dsp_engine_t* engine) {
     engine->underrun_count.store(0);
 }
 
-radioform_error_t radioform_dsp_set_sample_rate(
-    radioform_dsp_engine_t* engine,
+krisha_error_t krisha_dsp_set_sample_rate(
+    krisha_dsp_engine_t* engine,
     uint32_t sample_rate
 ) {
-    if (!engine) return RADIOFORM_ERROR_NULL_POINTER;
+    if (!engine) return KRISHA_ERROR_NULL_POINTER;
     if (sample_rate < 8000 || sample_rate > 384000) {
-        return RADIOFORM_ERROR_INVALID_PARAM;
+        return KRISHA_ERROR_INVALID_PARAM;
     }
 
     engine->sample_rate = sample_rate;
@@ -187,15 +191,15 @@ radioform_error_t radioform_dsp_set_sample_rate(
     engine->dc_blocker.init(static_cast<float>(sample_rate), 5.0f);
 
     // Recalculate filter coefficients
-    return radioform_dsp_apply_preset(engine, &engine->current_preset);
+    return krisha_dsp_apply_preset(engine, &engine->current_preset);
 }
 
 // ============================================================================
 // Audio Processing (REALTIME-SAFE)
 // ============================================================================
 
-void radioform_dsp_process_interleaved(
-    radioform_dsp_engine_t* engine,
+void krisha_dsp_process_interleaved(
+    krisha_dsp_engine_t* engine,
     const float* input,
     float* output,
     uint32_t num_frames
@@ -294,8 +298,8 @@ void radioform_dsp_process_interleaved(
     engine->frames_processed.fetch_add(num_frames, std::memory_order_relaxed);
 }
 
-void radioform_dsp_process_planar(
-    radioform_dsp_engine_t* engine,
+void krisha_dsp_process_planar(
+    krisha_dsp_engine_t* engine,
     const float* input_left,
     const float* input_right,
     float* output_left,
@@ -416,27 +420,27 @@ void radioform_dsp_process_planar(
 // Preset Management (NOT realtime-safe)
 // ============================================================================
 
-radioform_error_t radioform_dsp_apply_preset(
-    radioform_dsp_engine_t* engine,
-    const radioform_preset_t* preset
+krisha_error_t krisha_dsp_apply_preset(
+    krisha_dsp_engine_t* engine,
+    const krisha_preset_t* preset
 ) {
     if (!engine || !preset) {
-        return RADIOFORM_ERROR_NULL_POINTER;
+        return KRISHA_ERROR_NULL_POINTER;
     }
 
     // Validate preset
-    radioform_error_t err = radioform_dsp_preset_validate(preset);
-    if (err != RADIOFORM_OK) {
+    krisha_error_t err = krisha_dsp_preset_validate(preset);
+    if (err != KRISHA_OK) {
         return err;
     }
 
     // Copy preset
-    std::memcpy(&engine->current_preset, preset, sizeof(radioform_preset_t));
+    std::memcpy(&engine->current_preset, preset, sizeof(krisha_preset_t));
     engine->num_active_bands = preset->num_bands;
 
     // Update filter coefficients and smoothers for each band
     for (uint32_t i = 0; i < preset->num_bands; i++) {
-        const radioform_band_t& band = preset->bands[i];
+        const krisha_band_t& band = preset->bands[i];
 
         if (band.enabled) {
             engine->bands[i].setCoeffs(band, static_cast<float>(engine->sample_rate));
@@ -460,37 +464,37 @@ radioform_error_t radioform_dsp_apply_preset(
         engine->limiter.setThreshold(preset->limiter_threshold_db);
     }
 
-    return RADIOFORM_OK;
+    return KRISHA_OK;
 }
 
-radioform_error_t radioform_dsp_get_preset(
-    radioform_dsp_engine_t* engine,
-    radioform_preset_t* preset
+krisha_error_t krisha_dsp_get_preset(
+    krisha_dsp_engine_t* engine,
+    krisha_preset_t* preset
 ) {
     if (!engine || !preset) {
-        return RADIOFORM_ERROR_NULL_POINTER;
+        return KRISHA_ERROR_NULL_POINTER;
     }
 
-    std::memcpy(preset, &engine->current_preset, sizeof(radioform_preset_t));
-    return RADIOFORM_OK;
+    std::memcpy(preset, &engine->current_preset, sizeof(krisha_preset_t));
+    return KRISHA_OK;
 }
 
 // ============================================================================
 // Realtime Parameter Updates (Lock-free & Realtime-safe)
 // ============================================================================
 
-void radioform_dsp_set_bypass(radioform_dsp_engine_t* engine, bool bypass) {
+void krisha_dsp_set_bypass(krisha_dsp_engine_t* engine, bool bypass) {
     if (engine) {
         engine->bypass.store(bypass, std::memory_order_relaxed);
     }
 }
 
-bool radioform_dsp_get_bypass(const radioform_dsp_engine_t* engine) {
+bool krisha_dsp_get_bypass(const krisha_dsp_engine_t* engine) {
     return engine ? engine->bypass.load(std::memory_order_relaxed) : true;
 }
 
-void radioform_dsp_update_band_gain(
-    radioform_dsp_engine_t* engine,
+void krisha_dsp_update_band_gain(
+    krisha_dsp_engine_t* engine,
     uint32_t band_index,
     float gain_db
 ) {
@@ -499,7 +503,7 @@ void radioform_dsp_update_band_gain(
     gain_db = std::max(-12.0f, std::min(12.0f, gain_db));
     engine->current_preset.bands[band_index].gain_db = gain_db;
 
-    const radioform_band_t& band = engine->current_preset.bands[band_index];
+    const krisha_band_t& band = engine->current_preset.bands[band_index];
     engine->bands[band_index].setCoeffsSmooth(
         band, static_cast<float>(engine->sample_rate),
         engine->coeff_transition_samples
@@ -508,8 +512,8 @@ void radioform_dsp_update_band_gain(
     engine->update_effective_bands();
 }
 
-void radioform_dsp_update_preamp(
-    radioform_dsp_engine_t* engine,
+void krisha_dsp_update_preamp(
+    krisha_dsp_engine_t* engine,
     float gain_db
 ) {
     if (!engine) return;
@@ -524,8 +528,8 @@ void radioform_dsp_update_preamp(
     engine->preamp_right_smoother.setTarget(target_gain);
 }
 
-void radioform_dsp_update_preamp_left(
-    radioform_dsp_engine_t* engine,
+void krisha_dsp_update_preamp_left(
+    krisha_dsp_engine_t* engine,
     float gain_db
 ) {
     if (!engine) return;
@@ -537,8 +541,8 @@ void radioform_dsp_update_preamp_left(
     engine->preamp_left_smoother.setTarget(target_gain);
 }
 
-void radioform_dsp_update_preamp_right(
-    radioform_dsp_engine_t* engine,
+void krisha_dsp_update_preamp_right(
+    krisha_dsp_engine_t* engine,
     float gain_db
 ) {
     if (!engine) return;
@@ -550,8 +554,8 @@ void radioform_dsp_update_preamp_right(
     engine->preamp_right_smoother.setTarget(target_gain);
 }
 
-void radioform_dsp_update_band_frequency(
-    radioform_dsp_engine_t* engine,
+void krisha_dsp_update_band_frequency(
+    krisha_dsp_engine_t* engine,
     uint32_t band_index,
     float frequency_hz
 ) {
@@ -560,7 +564,7 @@ void radioform_dsp_update_band_frequency(
     frequency_hz = std::max(20.0f, std::min(20000.0f, frequency_hz));
     engine->current_preset.bands[band_index].frequency_hz = frequency_hz;
 
-    const radioform_band_t& band = engine->current_preset.bands[band_index];
+    const krisha_band_t& band = engine->current_preset.bands[band_index];
     engine->bands[band_index].setCoeffsSmooth(
         band, static_cast<float>(engine->sample_rate),
         engine->coeff_transition_samples
@@ -569,8 +573,8 @@ void radioform_dsp_update_band_frequency(
     engine->update_effective_bands();
 }
 
-void radioform_dsp_update_band_q(
-    radioform_dsp_engine_t* engine,
+void krisha_dsp_update_band_q(
+    krisha_dsp_engine_t* engine,
     uint32_t band_index,
     float q_factor
 ) {
@@ -579,7 +583,7 @@ void radioform_dsp_update_band_q(
     q_factor = std::max(0.1f, std::min(10.0f, q_factor));
     engine->current_preset.bands[band_index].q_factor = q_factor;
 
-    const radioform_band_t& band = engine->current_preset.bands[band_index];
+    const krisha_band_t& band = engine->current_preset.bands[band_index];
     engine->bands[band_index].setCoeffsSmooth(
         band, static_cast<float>(engine->sample_rate),
         engine->coeff_transition_samples
@@ -592,9 +596,9 @@ void radioform_dsp_update_band_q(
 // Diagnostics & Live Graphing
 // ============================================================================
 
-void radioform_dsp_get_stats(
-    const radioform_dsp_engine_t* engine,
-    radioform_stats_t* stats
+void krisha_dsp_get_stats(
+    const krisha_dsp_engine_t* engine,
+    krisha_stats_t* stats
 ) {
     if (!engine || !stats) return;
 
@@ -616,12 +620,12 @@ void radioform_dsp_get_stats(
         : min_db;
 }
 
-const char* radioform_dsp_get_version(void) {
+const char* krisha_dsp_get_version(void) {
     return "1.0.0";
 }
 
-float radioform_dsp_get_magnitude_at_frequency(
-    const radioform_dsp_engine_t* engine,
+float krisha_dsp_get_magnitude_at_frequency(
+    const krisha_dsp_engine_t* engine,
     float frequency_hz,
     bool left_channel
 ) {
@@ -666,6 +670,6 @@ float radioform_dsp_get_magnitude_at_frequency(
 // Performance Optimizations
 // ============================================================================
 
-void radioform_dsp_enable_denormal_suppression(void) {
+void krisha_dsp_enable_denormal_suppression(void) {
     enable_denormal_suppression();
 }

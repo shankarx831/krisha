@@ -1,3 +1,7 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file main.c
  * @brief PipeWire virtual sink daemon spoke implementation wrapping the C++ DSP Core.
@@ -14,10 +18,10 @@
 #include <spa/param/audio/raw.h>
 #include <spa/utils/result.h>
 
-#include "radioform_dsp.h"
+#include "krisha_dsp.h"
 
 // Global Engine Context (allocated at startup, freed at teardown)
-static radioform_dsp_engine_t* g_engine = NULL;
+static krisha_dsp_engine_t* g_engine = NULL;
 static struct pw_main_loop* g_loop = NULL;
 
 // Lock-free atomic/volatile state variables for the real-time processing loop
@@ -56,7 +60,7 @@ static void on_stream_process(void *data) {
 
     if (g_engine && !g_bypass) {
         // Process audio in-place using the optimized universal DSP engine
-        radioform_dsp_process_interleaved(g_engine, samples, samples, n_frames);
+        krisha_dsp_process_interleaved(g_engine, samples, samples, n_frames);
     }
 
     pw_stream_queue_buffer(stream, b);
@@ -67,7 +71,7 @@ static void handle_signal(int sig) {
     if (g_loop) {
         // Request loop to quit safely
         // In mock or production, this signals main thread to terminate
-        printf("\nShutting down Radioform PipeWire virtual sink...\n");
+        printf("\nShutting down Krisha PipeWire virtual sink...\n");
         // For simulation/mock purposes, we call exit or stop loop if pw_main_loop_quit was defined
         exit(0);
     }
@@ -75,7 +79,7 @@ static void handle_signal(int sig) {
 
 int main(int argc, char **argv) {
     printf("==================================================\n");
-    printf("Radioform Linux Spoke: PipeWire Daemon Starting\n");
+    printf("Krisha Linux Spoke: PipeWire Daemon Starting\n");
     printf("==================================================\n");
 
     // Handle signals
@@ -83,17 +87,17 @@ int main(int argc, char **argv) {
     signal(SIGTERM, handle_signal);
 
     // Initialize the frozen universal DSP engine context
-    g_engine = radioform_dsp_create(g_sample_rate);
+    g_engine = krisha_dsp_create(g_sample_rate);
     if (!g_engine) {
-        fprintf(stderr, "Fatal: Failed to create Radioform DSP context.\n");
+        fprintf(stderr, "Fatal: Failed to create Krisha DSP context.\n");
         return EXIT_FAILURE;
     }
 
     // Apply a standard flat preset
-    radioform_preset_t preset;
-    radioform_dsp_preset_init_flat(&preset);
-    radioform_dsp_apply_preset(g_engine, &preset);
-    radioform_dsp_set_bypass(g_engine, false);
+    krisha_preset_t preset;
+    krisha_dsp_preset_init_flat(&preset);
+    krisha_dsp_apply_preset(g_engine, &preset);
+    krisha_dsp_set_bypass(g_engine, false);
 
     // Initialize PipeWire client
     pw_init(&argc, &argv);
@@ -101,7 +105,7 @@ int main(int argc, char **argv) {
     g_loop = pw_main_loop_new(NULL);
     if (!g_loop) {
         fprintf(stderr, "Fatal: Failed to create PipeWire main loop.\n");
-        radioform_dsp_destroy(g_engine);
+        krisha_dsp_destroy(g_engine);
         return EXIT_FAILURE;
     }
 
@@ -109,7 +113,7 @@ int main(int argc, char **argv) {
     if (!context) {
         fprintf(stderr, "Fatal: Failed to create PipeWire context.\n");
         pw_main_loop_destroy(g_loop);
-        radioform_dsp_destroy(g_engine);
+        krisha_dsp_destroy(g_engine);
         return EXIT_FAILURE;
     }
 
@@ -118,7 +122,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Fatal: Failed to connect to PipeWire core.\n");
         pw_context_destroy(context);
         pw_main_loop_destroy(g_loop);
-        radioform_dsp_destroy(g_engine);
+        krisha_dsp_destroy(g_engine);
         return EXIT_FAILURE;
     }
 
@@ -131,7 +135,7 @@ int main(int argc, char **argv) {
     // Create stream
     struct pw_stream *stream = pw_stream_new_simple(
         pw_main_loop_get_loop(g_loop),
-        "Radioform Virtual Sink",
+        "Krisha Virtual Sink",
         NULL,
         &events,
         NULL
@@ -142,7 +146,7 @@ int main(int argc, char **argv) {
         pw_core_disconnect(core);
         pw_context_destroy(context);
         pw_main_loop_destroy(g_loop);
-        radioform_dsp_destroy(g_engine);
+        krisha_dsp_destroy(g_engine);
         return EXIT_FAILURE;
     }
 
@@ -156,7 +160,7 @@ int main(int argc, char **argv) {
     pw_core_disconnect(core);
     pw_context_destroy(context);
     pw_main_loop_destroy(g_loop);
-    radioform_dsp_destroy(g_engine);
+    krisha_dsp_destroy(g_engine);
     pw_deinit();
 
     printf("Teardown complete. Exiting.\n");

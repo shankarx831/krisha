@@ -1,3 +1,7 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file wav_processor.cpp
  * @brief Simple WAV file processor for testing DSP engine
@@ -6,7 +10,7 @@
  * Presets: bass, treble, vocal, flat
  */
 
-#include "radioform_dsp.h"
+#include "krisha_dsp.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -177,8 +181,8 @@ bool writeWAV(const char* filename, const WAVHeader& header, const std::vector<f
 // Preset Configurations
 // ============================================================================
 
-void createBassBoostPreset(radioform_preset_t* preset) {
-    radioform_dsp_preset_init_flat(preset);
+void createBassBoostPreset(krisha_preset_t* preset) {
+    krisha_dsp_preset_init_flat(preset);
     strncpy(preset->name, "Bass Boost", sizeof(preset->name) - 1);
 
     preset->num_bands = 3;
@@ -188,28 +192,28 @@ void createBassBoostPreset(radioform_preset_t* preset) {
     preset->bands[0].frequency_hz = 60.0f;
     preset->bands[0].gain_db = 8.0f;
     preset->bands[0].q_factor = 0.707f;
-    preset->bands[0].type = RADIOFORM_FILTER_LOW_SHELF;
+    preset->bands[0].type = KRISHA_FILTER_LOW_SHELF;
 
     // Bass peak (+4 dB at 150 Hz)
     preset->bands[1].enabled = true;
     preset->bands[1].frequency_hz = 150.0f;
     preset->bands[1].gain_db = 4.0f;
     preset->bands[1].q_factor = 1.0f;
-    preset->bands[1].type = RADIOFORM_FILTER_PEAK;
+    preset->bands[1].type = KRISHA_FILTER_PEAK;
 
     // Mid cut (-2 dB at 800 Hz to balance)
     preset->bands[2].enabled = true;
     preset->bands[2].frequency_hz = 800.0f;
     preset->bands[2].gain_db = -2.0f;
     preset->bands[2].q_factor = 1.5f;
-    preset->bands[2].type = RADIOFORM_FILTER_PEAK;
+    preset->bands[2].type = KRISHA_FILTER_PEAK;
 
     preset->preamp_db = -6.0f; // Reduce preamp to prevent clipping
     preset->limiter_enabled = true;
 }
 
-void createTrebleBoostPreset(radioform_preset_t* preset) {
-    radioform_dsp_preset_init_flat(preset);
+void createTrebleBoostPreset(krisha_preset_t* preset) {
+    krisha_dsp_preset_init_flat(preset);
     strncpy(preset->name, "Treble Boost", sizeof(preset->name) - 1);
 
     preset->num_bands = 4;
@@ -219,35 +223,35 @@ void createTrebleBoostPreset(radioform_preset_t* preset) {
     preset->bands[0].frequency_hz = 2000.0f;
     preset->bands[0].gain_db = 6.0f;
     preset->bands[0].q_factor = 1.5f;
-    preset->bands[0].type = RADIOFORM_FILTER_PEAK;
+    preset->bands[0].type = KRISHA_FILTER_PEAK;
 
     // Presence boost (+10 dB at 4 kHz)
     preset->bands[1].enabled = true;
     preset->bands[1].frequency_hz = 4000.0f;
     preset->bands[1].gain_db = 10.0f;
     preset->bands[1].q_factor = 2.5f;
-    preset->bands[1].type = RADIOFORM_FILTER_PEAK;
+    preset->bands[1].type = KRISHA_FILTER_PEAK;
 
     // Brilliance boost (+8 dB at 8 kHz)
     preset->bands[2].enabled = true;
     preset->bands[2].frequency_hz = 8000.0f;
     preset->bands[2].gain_db = 8.0f;
     preset->bands[2].q_factor = 1.5f;
-    preset->bands[2].type = RADIOFORM_FILTER_PEAK;
+    preset->bands[2].type = KRISHA_FILTER_PEAK;
 
     // Air shelf (+12 dB at 12 kHz)
     preset->bands[3].enabled = true;
     preset->bands[3].frequency_hz = 12000.0f;
     preset->bands[3].gain_db = 12.0f;
     preset->bands[3].q_factor = 0.707f;
-    preset->bands[3].type = RADIOFORM_FILTER_HIGH_SHELF;
+    preset->bands[3].type = KRISHA_FILTER_HIGH_SHELF;
 
     preset->preamp_db = -8.0f; // Heavy preamp reduction
     preset->limiter_enabled = true;
 }
 
-void createVocalEnhancePreset(radioform_preset_t* preset) {
-    radioform_dsp_preset_init_flat(preset);
+void createVocalEnhancePreset(krisha_preset_t* preset) {
+    krisha_dsp_preset_init_flat(preset);
     strncpy(preset->name, "Vocal Enhance", sizeof(preset->name) - 1);
 
     preset->num_bands = 4;
@@ -257,28 +261,28 @@ void createVocalEnhancePreset(radioform_preset_t* preset) {
     preset->bands[0].frequency_hz = 80.0f;
     preset->bands[0].gain_db = 0.0f;
     preset->bands[0].q_factor = 0.707f;
-    preset->bands[0].type = RADIOFORM_FILTER_HIGH_PASS;
+    preset->bands[0].type = KRISHA_FILTER_HIGH_PASS;
 
     // Reduce muddiness
     preset->bands[1].enabled = true;
     preset->bands[1].frequency_hz = 250.0f;
     preset->bands[1].gain_db = -3.0f;
     preset->bands[1].q_factor = 1.0f;
-    preset->bands[1].type = RADIOFORM_FILTER_PEAK;
+    preset->bands[1].type = KRISHA_FILTER_PEAK;
 
     // Presence boost for clarity
     preset->bands[2].enabled = true;
     preset->bands[2].frequency_hz = 3000.0f;
     preset->bands[2].gain_db = 5.0f;
     preset->bands[2].q_factor = 2.0f;
-    preset->bands[2].type = RADIOFORM_FILTER_PEAK;
+    preset->bands[2].type = KRISHA_FILTER_PEAK;
 
     // Reduce sibilance
     preset->bands[3].enabled = true;
     preset->bands[3].frequency_hz = 8000.0f;
     preset->bands[3].gain_db = -2.0f;
     preset->bands[3].q_factor = 1.5f;
-    preset->bands[3].type = RADIOFORM_FILTER_PEAK;
+    preset->bands[3].type = KRISHA_FILTER_PEAK;
 
     preset->preamp_db = -2.0f;
     preset->limiter_enabled = true;
@@ -290,7 +294,7 @@ void createVocalEnhancePreset(radioform_preset_t* preset) {
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        std::cout << "Radioform DSP WAV Processor" << std::endl;
+        std::cout << "Krisha DSP WAV Processor" << std::endl;
         std::cout << "Usage: " << argv[0] << " input.wav output.wav [preset]" << std::endl;
         std::cout << std::endl;
         std::cout << "Presets:" << std::endl;
@@ -320,14 +324,14 @@ int main(int argc, char* argv[]) {
     }
 
     // Create DSP engine
-    radioform_dsp_engine_t* engine = radioform_dsp_create(header.sample_rate);
+    krisha_dsp_engine_t* engine = krisha_dsp_create(header.sample_rate);
     if (!engine) {
         std::cerr << "Error: Failed to create DSP engine" << std::endl;
         return 1;
     }
 
     // Apply preset
-    radioform_preset_t preset;
+    krisha_preset_t preset;
     if (strcmp(preset_name, "bass") == 0) {
         createBassBoostPreset(&preset);
     } else if (strcmp(preset_name, "treble") == 0) {
@@ -335,16 +339,16 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(preset_name, "vocal") == 0) {
         createVocalEnhancePreset(&preset);
     } else {
-        radioform_dsp_preset_init_flat(&preset);
+        krisha_dsp_preset_init_flat(&preset);
     }
 
     std::cout << std::endl;
     std::cout << "Applying preset: " << preset.name << std::endl;
 
-    radioform_error_t err = radioform_dsp_apply_preset(engine, &preset);
-    if (err != RADIOFORM_OK) {
+    krisha_error_t err = krisha_dsp_apply_preset(engine, &preset);
+    if (err != KRISHA_OK) {
         std::cerr << "Error: Failed to apply preset" << std::endl;
-        radioform_dsp_destroy(engine);
+        krisha_dsp_destroy(engine);
         return 1;
     }
 
@@ -352,24 +356,24 @@ int main(int argc, char* argv[]) {
     std::cout << "Processing audio..." << std::endl;
 
     uint32_t num_frames = samples.size() / 2;
-    radioform_dsp_process_interleaved(engine, samples.data(), samples.data(), num_frames);
+    krisha_dsp_process_interleaved(engine, samples.data(), samples.data(), num_frames);
 
     std::cout << "Processed " << num_frames << " frames" << std::endl;
 
     // Get statistics
-    radioform_stats_t stats;
-    radioform_dsp_get_stats(engine, &stats);
+    krisha_stats_t stats;
+    krisha_dsp_get_stats(engine, &stats);
     std::cout << "Total frames processed: " << stats.frames_processed << std::endl;
 
     // Write output WAV file
     std::cout << std::endl;
     if (!writeWAV(output_file, header, samples)) {
-        radioform_dsp_destroy(engine);
+        krisha_dsp_destroy(engine);
         return 1;
     }
 
     // Cleanup
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
 
     std::cout << std::endl;
     std::cout << "Success! Play the files to compare:" << std::endl;

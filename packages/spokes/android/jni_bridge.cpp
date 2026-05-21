@@ -1,3 +1,7 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file jni_bridge.cpp
  * @brief Android JNI Bridge spoke implementation.
@@ -6,7 +10,7 @@
 #include <jni.h>
 #include <string.h>
 #include <vector>
-#include "radioform_universal.h"
+#include "krisha_universal.h"
 
 extern "C" {
 
@@ -14,15 +18,15 @@ extern "C" {
  * JNI method that parses a raw AutoEq preset text file and returns a flat float array.
  * 
  * Java Class Definition:
- * package com.radioform.spoke.android;
- * public class RadioformJNI {
+ * package com.krisha.spoke.android;
+ * public class KrishaJNI {
  *     public static native float[] parseAutoEq(String autoEqText);
  * }
  * 
  * Returns flat array: [preamp, preamp_left, preamp_right, num_bands, f0, g0, q0, t0, ...]
  */
 JNIEXPORT jfloatArray JNICALL
-Java_com_radioform_spoke_android_RadioformJNI_parseAutoEq(
+Java_com_krisha_spoke_android_KrishaJNI_parseAutoEq(
     JNIEnv env,
     jclass clazz,
     jstring jAutoEqText
@@ -37,14 +41,14 @@ Java_com_radioform_spoke_android_RadioformJNI_parseAutoEq(
         return NULL;
     }
 
-    // Parse the AutoEq text into a standard radioform_preset_t structure
-    radioform_preset_t preset;
-    radioform_error_t err = radioform_preset_parse_autoeq(text, &preset);
+    // Parse the AutoEq text into a standard krisha_preset_t structure
+    krisha_preset_t preset;
+    krisha_error_t err = krisha_preset_parse_autoeq(text, &preset);
 
     // CRITICAL: Immediately release the Java String characters to prevent Dalvik/ART heap leaks
     env->ReleaseStringUTFChars(jAutoEqText, text);
 
-    if (err != RADIOFORM_OK) {
+    if (err != KRISHA_OK) {
         return NULL;
     }
 

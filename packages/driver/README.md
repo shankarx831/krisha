@@ -1,8 +1,8 @@
-# Radioform HAL Driver
+# Krisha HAL Driver
 
 A CoreAudio HAL (Hardware Abstraction Layer) plugin for macOS that creates virtual proxy output devices. When an app sends audio to a proxy device, the driver writes it into shared memory. The host process reads from shared memory, runs DSP, and renders to the real hardware device.
 
-The driver runs inside `coreaudiod` (not as a standalone process). When installed at `/Library/Audio/Plug-Ins/HAL/RadioformDriver.driver`, macOS loads it as a system audio plugin.
+The driver runs inside `coreaudiod` (not as a standalone process). When installed at `/Library/Audio/Plug-Ins/HAL/KrishaDriver.driver`, macOS loads it as a system audio plugin.
 
 ## How it works
 
@@ -17,7 +17,7 @@ Application audio
             |
             v
 +--------------------------+
-| RadioformDriver          |
+| KrishaDriver          |
 | (this plugin)            |
 |                          |
 | OnWriteMixedOutput()     |
@@ -26,10 +26,10 @@ Application audio
 | - ring buffer write      |
 +-----------+--------------+
             | shared memory (mmap)
-            | /tmp/radioform-<uid>
+            | /tmp/krisha-<uid>
             v
 +--------------------------+
-| RadioformHost            |
+| KrishaHost            |
 | - ring buffer read       |
 | - DSP processing         |
 | - hardware output        |
@@ -42,20 +42,20 @@ Application audio
 |---|---|
 | `src/Plugin.cpp` | Driver runtime logic: plugin factory, device creation/removal, IO handling, health checks |
 | `include/RFSharedAudio.h` | Shared memory protocol and ring buffer helpers |
-| `CMakeLists.txt` | Build config for `RadioformDriver.driver` |
-| `Info.plist` | Bundle metadata, factory UUID, bundle identifier (`com.radioform.driver`) |
-| `install.sh` | Installs `build/RadioformDriver.driver` to `/Library/Audio/Plug-Ins/HAL/` |
+| `CMakeLists.txt` | Build config for `KrishaDriver.driver` |
+| `Info.plist` | Bundle metadata, factory UUID, bundle identifier (`com.krisha.driver`) |
+| `install.sh` | Installs `build/KrishaDriver.driver` to `/Library/Audio/Plug-Ins/HAL/` |
 | `uninstall.sh` | Removes the installed driver bundle |
 | `VERSION` | Driver version (`2.0.8`) |
 | `vendor/libASPL/` | Third-party C++ wrapper around CoreAudio HAL plugin APIs |
 
 `include/RFSharedAudio.h` is intentionally kept in sync with:
-`packages/host/Sources/CRadioformAudio/include/RFSharedAudio.h`
+`packages/host/Sources/CKrishaAudio/include/RFSharedAudio.h`
 
 ## Entry point
 
 ```cpp
-extern "C" void* RadioformDriverPluginFactory(CFAllocatorRef allocator, CFUUIDRef typeUUID)
+extern "C" void* KrishaDriverPluginFactory(CFAllocatorRef allocator, CFUUIDRef typeUUID)
 ```
 
 If `typeUUID` matches `kAudioServerPlugInTypeUUID`, this function lazily creates global driver state and returns the plugin reference. The factory UUID is `B3F04000-8F04-4F84-A72E-B2D4F8E6F1DA` (declared in `Info.plist`).
@@ -64,7 +64,7 @@ If `typeUUID` matches `kAudioServerPlugInTypeUUID`, this function lazily creates
 
 The driver does not hardcode proxy devices. It reconciles desired devices from a host-written control file.
 
-### Control file: `/tmp/radioform-devices.txt`
+### Control file: `/tmp/krisha-devices.txt`
 
 Format per line:
 
@@ -84,9 +84,9 @@ DeviceName|DeviceUID
 
 `CreateProxyDevice()` creates one output-only proxy device with:
 
-- Name: `"<OriginalName> (Radioform)"`
-- UID: `"<OriginalUID>-radioform"`
-- Manufacturer: `"Radioform"`
+- Name: `"<OriginalName> (Krisha)"`
+- UID: `"<OriginalUID>-krisha"`
+- Manufacturer: `"Krisha"`
 - Default format: 48 kHz, 2 channels
 - Mixing enabled
 - Stream controls via `AddStreamWithControlsAsync(aspl::Direction::Output)`
@@ -98,7 +98,7 @@ DeviceName|DeviceUID
 
 When the first client starts IO, the handler:
 
-1. Opens `/tmp/radioform-<sanitized-uid>`
+1. Opens `/tmp/krisha-<sanitized-uid>`
 2. Maps shared memory with `PROT_READ | PROT_WRITE` and `MAP_SHARED`
 3. Validates protocol version, sample rate, and channel count
 4. Sets `driver_connected = 1`
@@ -186,7 +186,7 @@ Single producer (driver) and single consumer (host), with monotonically increasi
 
 Current liveness checks are applied during proxy-device sync (not in the per-buffer IO callback path):
 
-- `HostHeartbeatFresh()` maps `/tmp/radioform-<uid>` read-only, tracks `host_heartbeat` changes, and treats heartbeat as stale after 5 seconds with no change.
+- `HostHeartbeatFresh()` maps `/tmp/krisha-<uid>` read-only, tracks `host_heartbeat` changes, and treats heartbeat as stale after 5 seconds with no change.
 - `SyncDevices()` only keeps/adds devices with fresh heartbeat state; stale entries are skipped and existing stale devices are removed.
 
 `UniversalAudioHandler` also includes `IsHealthy()` and `AttemptRecovery()` helpers for shared-memory/file/ring validation, but they are not currently called from `OnWriteMixedOutput()`.
@@ -212,7 +212,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-Output bundle: `build/RadioformDriver.driver`
+Output bundle: `build/KrishaDriver.driver`
 
 Debug build (AddressSanitizer enabled by project flags):
 
@@ -231,9 +231,9 @@ sudo killall coreaudiod
 
 Notes:
 
-- `install.sh` expects `./build/RadioformDriver.driver` to exist.
+- `install.sh` expects `./build/KrishaDriver.driver` to exist.
 - Script prompts for admin rights (`sudo`) internally for copy/ownership changes.
-- Install target: `/Library/Audio/Plug-Ins/HAL/RadioformDriver.driver`
+- Install target: `/Library/Audio/Plug-Ins/HAL/KrishaDriver.driver`
 - Restarting `coreaudiod` is required for load/unload and interrupts audio briefly.
 
 ## Uninstalling
@@ -246,24 +246,24 @@ sudo killall coreaudiod
 
 ## Logging
 
-- `os_log` subsystem: `com.radioform.driver`
-- Fallback file log: `/tmp/radioform-driver-debug.log`
+- `os_log` subsystem: `com.krisha.driver`
+- Fallback file log: `/tmp/krisha-driver-debug.log`
 
 Example unified log query:
 
 ```sh
-log show --predicate 'subsystem == "com.radioform.driver"' --last 5m
+log show --predicate 'subsystem == "com.krisha.driver"' --last 5m
 ```
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
-| No proxy devices appear | Confirm host is running and `/tmp/radioform-devices.txt` exists |
-| `OnStartIO` fails after retries | Confirm shared memory files exist: `ls /tmp/radioform-*` |
+| No proxy devices appear | Confirm host is running and `/tmp/krisha-devices.txt` exists |
+| `OnStartIO` fails after retries | Confirm shared memory files exist: `ls /tmp/krisha-*` |
 | Audio dropouts | Inspect overrun/underrun stats in logs |
 | Driver not loading | Verify install path and restart `coreaudiod` |
-| Stale proxy devices | Remove stale `/tmp/radioform-devices.txt` entry source and restart host/`coreaudiod` |
+| Stale proxy devices | Remove stale `/tmp/krisha-devices.txt` entry source and restart host/`coreaudiod` |
 
 ## Constants
 

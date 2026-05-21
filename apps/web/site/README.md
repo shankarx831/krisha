@@ -1,6 +1,6 @@
-# Radioform Marketing Site
+# Krisha Marketing Site
 
-Next.js marketing and documentation site for Radioform.
+Next.js marketing and documentation site for Krisha.
 
 ## Stack
 

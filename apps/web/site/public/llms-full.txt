@@ -1,10 +1,10 @@
-# Radioform — Complete Reference
+# Krisha — Complete Reference
 
-> Radioform is a free, open-source native macOS equalizer that lives in your menu bar and shapes your sound system-wide.
+> Krisha is a free, open-source native macOS equalizer that lives in your menu bar and shapes your sound system-wide.
 
-## What Is Radioform?
+## What Is Krisha?
 
-Radioform is a system-wide equalizer application for macOS. It installs a virtual audio device on your Mac so that all system sound—from Spotify, SoundCloud, FaceTime, games, and any other app—passes through a high-quality DSP engine where it gets shaped by your EQ settings in real-time, then continues to your actual output device (speakers, headphones, etc.).
+Krisha is a system-wide equalizer application for macOS. It installs a virtual audio device on your Mac so that all system sound—from Spotify, SoundCloud, FaceTime, games, and any other app—passes through a high-quality DSP engine where it gets shaped by your EQ settings in real-time, then continues to your actual output device (speakers, headphones, etc.).
 
 It runs from your menu bar. You pick a preset or tweak the sliders yourself, and then you mostly just leave it alone.
 
@@ -36,7 +36,7 @@ It runs from your menu bar. You pick a preset or tweak the sliders yourself, and
 These are solid starting points. You can also save your own custom curves for specific headphones or speakers.
 
 ### Multi-Device Support
-- AirPods, desk speakers, living room setup—Radioform follows your output device
+- AirPods, desk speakers, living room setup—Krisha follows your output device
 - Save different EQ curves per device
 - Switching devices does not require restarting the app
 
@@ -55,7 +55,7 @@ These are solid starting points. You can also save your own custom curves for sp
 The audio engine is written in C++ using cascaded biquad filters for precise EQ control. It processes audio sample-by-sample with no intermediate buffering, ensuring zero added latency.
 
 ### Virtual Audio Device
-Radioform installs a virtual audio device using Apple's Audio Server Plugin (libASPL) framework. All system sound passes through this device, gets processed by the EQ engine, and continues to your actual speakers or headphones.
+Krisha installs a virtual audio device using Apple's Audio Server Plugin (libASPL) framework. All system sound passes through this device, gets processed by the EQ engine, and continues to your actual speakers or headphones.
 
 ### Native Application
 The menu bar app is built with native Swift and SwiftUI—not Electron or a web wrapper. It plugs directly into macOS CoreAudio, so it feels like something that should have shipped with the OS.
@@ -80,14 +80,14 @@ The app and audio engine communicate through a clean C API and shared memory for
 ## How To Get Started
 
 1. Download and install the DMG from GitHub Releases
-2. Open Radioform—it appears in your menu bar
+2. Open Krisha—it appears in your menu bar
 3. Select your audio output device
 4. Choose a preset or create your own EQ curve
 5. Enjoy your customized sound
 
 ## Comparison With Alternatives
 
-| Feature | Radioform | SoundSource | eqMac | Boom 3D |
+| Feature | Krisha | SoundSource | eqMac | Boom 3D |
 |---|---|---|---|---|
 | Price | Free | $39 | Free/Paid | $19.99 |
 | Open Source | Yes (GPLv3) | No | Partially | No |
@@ -99,10 +99,10 @@ The app and audio engine communicate through a clean C API and shared memory for
 
 ## Links
 
-- Homepage: https://radioform.app
-- About / How It Works: https://radioform.app/about
-- Download: https://github.com/Torteous44/radioform/releases/latest/download/Radioform.dmg
-- GitHub: https://github.com/Torteous44/radioform
+- Homepage: https://krisha.app
+- About / How It Works: https://krisha.app/about
+- Download: https://github.com/Torteous44/krisha/releases/latest/download/Krisha.dmg
+- GitHub: https://github.com/Torteous44/krisha
 
 ## Creator
 

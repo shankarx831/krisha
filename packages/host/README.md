@@ -1,15 +1,15 @@
-# Radioform Host
+# Krisha Host
 
-`RadioformHost` is the background audio process used by Radioform on macOS.
+`KrishaHost` is the background audio process used by Krisha on macOS.
 It discovers physical output devices, creates shared memory endpoints for the HAL driver, runs DSP, and renders audio to the selected physical device.
 
 ## What It Does
 
-- Enumerates physical output devices (excluding Radioform/Netcat and virtual/aggregate devices)
+- Enumerates physical output devices (excluding Krisha/Netcat and virtual/aggregate devices)
 - Validates candidate devices (active channels, display-audio jack status, format/rate checks)
 - Chooses an operating sample rate at startup from the current/selected physical device
-- Creates one shared-memory file per physical device (`/tmp/radioform-<sanitized-uid>`)
-- Writes the driver control file (`/tmp/radioform-devices.txt`)
+- Creates one shared-memory file per physical device (`/tmp/krisha-<sanitized-uid>`)
+- Writes the driver control file (`/tmp/krisha-devices.txt`)
 - Starts heartbeat updates for driver/host health signaling
 - Starts a CoreAudio HAL output unit and renders `ring buffer -> DSP -> hardware`
 - Auto-switches system output to the matching proxy device and forwards proxy volume/mute to the physical device
@@ -18,12 +18,12 @@ It discovers physical output devices, creates shared memory endpoints for the HA
 ## Architecture
 
 ```
-RadioformHost
+KrishaHost
   |- DeviceDiscovery      (enumerate + validate physical devices)
-  |- DeviceRegistry       (tracks devices, writes /tmp/radioform-devices.txt)
-  |- SharedMemoryManager  (creates /tmp/radioform-<uid>, heartbeat timer)
+  |- DeviceRegistry       (tracks devices, writes /tmp/krisha-devices.txt)
+  |- SharedMemoryManager  (creates /tmp/krisha-<uid>, heartbeat timer)
   |- ProxyDeviceManager   (proxy<->physical mapping, auto-select, volume/mute forwarding)
-  |- DSPProcessor         (CRadioformDSP wrapper)
+  |- DSPProcessor         (CKrishaDSP wrapper)
   |- AudioRenderer        (reads ring buffer, processes DSP, writes output buffers)
   |- AudioEngine          (HAL output unit setup/start/stop/switch)
   |- DeviceMonitor        (CoreAudio listeners for device/default-output changes)
@@ -38,10 +38,10 @@ Startup sequence in `main.swift`:
 1. Ensures app support/log directories and migrates old preset path
 2. Enumerates physical output devices and records validation status
 3. Resolves preferred output device and reads nominal sample rate
-4. Sets `RadioformConfig.activeSampleRate`
+4. Sets `KrishaConfig.activeSampleRate`
 5. Registers device/default-output listeners
 6. Creates shared memory for devices
-7. Writes `/tmp/radioform-devices.txt`
+7. Writes `/tmp/krisha-devices.txt`
 8. Starts host heartbeat timer
 9. Waits for driver proxy creation, then auto-selects proxy
 10. Initializes DSP (applies flat preset, and updates sample rate when needed)
@@ -64,9 +64,9 @@ Shutdown path:
 
 ## Paths and IPC
 
-- Control file: `/tmp/radioform-devices.txt`
-- Shared memory per device: `/tmp/radioform-<sanitized-uid>`
-- Preset file: `~/Library/Application Support/Radioform/preset.json`
+- Control file: `/tmp/krisha-devices.txt`
+- Shared memory per device: `/tmp/krisha-<sanitized-uid>`
+- Preset file: `~/Library/Application Support/Krisha/preset.json`
 
 ## Key Configuration (`Constants.swift`)
 
@@ -98,7 +98,7 @@ cd packages/host
 ./start_host.sh
 ```
 
-`start_host.sh` launches `.build/release/RadioformHost` when available, otherwise `.build/debug/RadioformHost`.
+`start_host.sh` launches `.build/release/KrishaHost` when available, otherwise `.build/debug/KrishaHost`.
 
 ## Logging
 
@@ -106,6 +106,6 @@ The host logs to stdout/stderr using step-oriented messages from `main.swift` an
 
 ## Dependencies
 
-- `CRadioformAudio` (shared memory/ring-buffer C interface)
-- `CRadioformDSP` (DSP C API)
+- `CKrishaAudio` (shared memory/ring-buffer C interface)
+- `CKrishaDSP` (DSP C API)
 - Apple frameworks: `CoreAudio`, `AudioToolbox`, `CoreFoundation`, `IOKit`

@@ -48,21 +48,21 @@ fi
 echo "INFO: Updating component versions to: $VERSION"
 echo ""
 
-# Update RadioformApp Info.plist
+# Update KrishaApp Info.plist
 if [ "$UPDATE_APP" = true ]; then
-    APP_PLIST="$PROJECT_ROOT/apps/mac/RadioformApp/Info.plist"
+    APP_PLIST="$PROJECT_ROOT/apps/mac/KrishaApp/Info.plist"
     if [ -f "$APP_PLIST" ]; then
         /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_PLIST" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" "$APP_PLIST"
         /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$APP_PLIST" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $VERSION" "$APP_PLIST"
-        echo "OK: Updated apps/mac/RadioformApp/Info.plist"
+        echo "OK: Updated apps/mac/KrishaApp/Info.plist"
     else
         echo "WARN: $APP_PLIST not found"
     fi
 fi
 
-# Update RadioformDriver Info.plist and VERSION file
+# Update KrishaDriver Info.plist and VERSION file
 if [ "$UPDATE_DRIVER" = true ]; then
     DRIVER_PLIST="$PROJECT_ROOT/packages/driver/Info.plist"
     if [ -f "$DRIVER_PLIST" ]; then
@@ -80,7 +80,7 @@ if [ "$UPDATE_DRIVER" = true ]; then
     fi
 fi
 
-# Update RadioformHost Info.plist
+# Update KrishaHost Info.plist
 if [ "$UPDATE_HOST" = true ]; then
     HOST_PLIST="$PROJECT_ROOT/packages/host/Info.plist"
     if [ -f "$HOST_PLIST" ]; then
@@ -103,9 +103,9 @@ if [ "$UPDATE_DRIVER" = true ]; then
         # Use sed to replace the version in project() line
         if [[ "$OSTYPE" == "darwin"* ]]; then
             # macOS sed requires -i with extension or '' and different regex syntax
-            sed -i '' "s/project(RadioformDriver VERSION [0-9a-zA-Z._-]*/project(RadioformDriver VERSION $CMAKE_VERSION/" "$DRIVER_CMAKE"
+            sed -i '' "s/project(KrishaDriver VERSION [0-9a-zA-Z._-]*/project(KrishaDriver VERSION $CMAKE_VERSION/" "$DRIVER_CMAKE"
         else
-            sed -i "s/project(RadioformDriver VERSION [0-9a-zA-Z._-]\+/project(RadioformDriver VERSION $CMAKE_VERSION/" "$DRIVER_CMAKE"
+            sed -i "s/project(KrishaDriver VERSION [0-9a-zA-Z._-]\+/project(KrishaDriver VERSION $CMAKE_VERSION/" "$DRIVER_CMAKE"
         fi
         echo "OK: Updated packages/driver/CMakeLists.txt"
     else
@@ -118,7 +118,7 @@ echo "OK: Version update complete"
 echo ""
 echo "Updated components:"
 if [ "$UPDATE_APP" = true ]; then
-    echo "  - App: $VERSION (apps/mac/RadioformApp/Info.plist)"
+    echo "  - App: $VERSION (apps/mac/KrishaApp/Info.plist)"
 fi
 if [ "$UPDATE_DRIVER" = true ]; then
     echo "  - Driver: $VERSION (packages/driver/Info.plist, CMakeLists.txt, VERSION)"

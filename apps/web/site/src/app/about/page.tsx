@@ -3,23 +3,23 @@ import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "How Radioform Works — System-Wide macOS Equalizer",
+  title: "How Krisha Works — System-Wide macOS Equalizer",
   description:
-    "Learn how Radioform works: a native C++ audio engine, virtual audio device, 10-band EQ, built-in presets, and zero-latency system-wide sound processing for macOS.",
+    "Learn how Krisha works: a native C++ audio engine, virtual audio device, 10-band EQ, built-in presets, and zero-latency system-wide sound processing for macOS.",
   alternates: {
     canonical: "/about",
   },
   openGraph: {
-    title: "How Radioform Works — System-Wide macOS Equalizer",
+    title: "How Krisha Works — System-Wide macOS Equalizer",
     description:
-      "Learn how Radioform works: a native C++ audio engine, virtual audio device, 10-band EQ, built-in presets, and zero-latency system-wide sound processing for macOS.",
-    url: "https://radioform.app/about",
+      "Learn how Krisha works: a native C++ audio engine, virtual audio device, 10-band EQ, built-in presets, and zero-latency system-wide sound processing for macOS.",
+    url: "https://krisha.app/about",
     images: [
       {
-        url: "/demo/radioform.png",
+        url: "/demo/krisha.png",
         width: 1024,
         height: 1024,
-        alt: "Radioform menu bar app showing a 10-band equalizer and genre presets",
+        alt: "Krisha menu bar app showing a 10-band equalizer and genre presets",
       },
     ],
   },
@@ -28,20 +28,20 @@ export const metadata: Metadata = {
 const aboutJsonLd = {
   "@context": "https://schema.org",
   "@type": "AboutPage",
-  name: "How Radioform Works",
+  name: "How Krisha Works",
   description:
-    "Technical details about Radioform's system-wide macOS equalizer: C++ audio engine, virtual audio device, native Swift app, and zero-latency processing.",
-  url: "https://radioform.app/about",
+    "Technical details about Krisha's system-wide macOS equalizer: C++ audio engine, virtual audio device, native Swift app, and zero-latency processing.",
+  url: "https://krisha.app/about",
   mainEntity: {
     "@type": "SoftwareApplication",
-    name: "Radioform",
-    url: "https://radioform.app",
+    name: "Krisha",
+    url: "https://krisha.app",
   },
 };
 
 const DOWNLOAD_URL =
-  "https://github.com/Torteous44/radioform/releases/latest/download/Radioform.dmg";
-const GITHUB_URL = "https://github.com/Torteous44/radioform";
+  "https://github.com/Torteous44/krisha/releases/latest/download/Krisha.dmg";
+const GITHUB_URL = "https://github.com/Torteous44/krisha";
 
 export default function Technology() {
   return (
@@ -74,8 +74,8 @@ export default function Technology() {
             Back
           </Link>
           <Image
-            src="/demo/radioform.png"
-            alt="Radioform menu bar app showing a 10-band equalizer and genre presets"
+            src="/demo/krisha.png"
+            alt="Krisha menu bar app showing a 10-band equalizer and genre presets"
             width={1024}
             height={1024}
             priority
@@ -95,10 +95,10 @@ export default function Technology() {
           {/* Overview */}
           <section className="space-y-4">
             <p>
-              Radioform is a system-wide equalizer for macOS. It sits between
+              Krisha is a system-wide equalizer for macOS. It sits between
               your apps and your speakers and lets you adjust how everything
               sounds. Spotify, Soundcloud, FaceTime, games. If your Mac is
-              playing it, Radioform can shape it.
+              playing it, Krisha can shape it.
             </p>
             <p>
               It works by inserting a virtual output device into CoreAudio’s
@@ -154,7 +154,7 @@ export default function Technology() {
                   Switch devices without restarting
                 </p>
                 <p className="col-span-12 sm:col-span-8 text-black leading-relaxed">
-                  AirPods, desk speakers, living room setup. Radioform follows
+                  AirPods, desk speakers, living room setup. Krisha follows
                   your output device and keeps your EQ applied. The host
                   reconfigures sample rate automatically.
                 </p>
@@ -183,7 +183,7 @@ export default function Technology() {
               Under the hood
             </h2>
             <p className="text-black">
-              Radioform installs a virtual audio device on your Mac. All system
+              Krisha installs a virtual audio device on your Mac. All system
               sound passes through it, gets processed by the EQ engine, and
               continues to your actual speakers or headphones.
             </p>

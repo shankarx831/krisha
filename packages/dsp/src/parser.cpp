@@ -1,9 +1,13 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file parser.cpp
  * @brief AutoEq ParametricEQ parser implementation
  */
 
-#include "radioform_dsp.h"
+#include "krisha_dsp.h"
 #include <string>
 #include <sstream>
 #include <algorithm>
@@ -51,16 +55,16 @@ static bool extract_float_after_key(const std::string& line, const std::string& 
     }
 }
 
-radioform_error_t radioform_preset_parse_autoeq(
+krisha_error_t krisha_preset_parse_autoeq(
     const char* text,
-    radioform_preset_t* preset
+    krisha_preset_t* preset
 ) {
     if (!text || !preset) {
-        return RADIOFORM_ERROR_NULL_POINTER;
+        return KRISHA_ERROR_NULL_POINTER;
     }
 
     // First initialize to flat
-    radioform_dsp_preset_init_flat(preset);
+    krisha_dsp_preset_init_flat(preset);
     std::strncpy(preset->name, "AutoEq Imported", sizeof(preset->name) - 1);
     preset->name[sizeof(preset->name) - 1] = '\0';
 
@@ -89,19 +93,19 @@ radioform_error_t radioform_preset_parse_autoeq(
         }
 
         // 2. Parse Filter
-        if (upper_line.find("FILTER") != std::string::npos && parsed_bands_count < RADIOFORM_MAX_BANDS) {
+        if (upper_line.find("FILTER") != std::string::npos && parsed_bands_count < KRISHA_MAX_BANDS) {
             // Find colon that separates "Filter N:" from params, or start from "Filter"
             size_t start_pos = line.find(':');
             std::string params_part = (start_pos != std::string::npos) ? line.substr(start_pos + 1) : line;
             params_part = trim(params_part);
             std::string upper_params = to_upper(params_part);
 
-            radioform_band_t band;
+            krisha_band_t band;
             band.enabled = true; // Default to enabled
             band.gain_db = 0.0f;
             band.q_factor = 1.0f;
             band.frequency_hz = 1000.0f;
-            band.type = RADIOFORM_FILTER_PEAK;
+            band.type = KRISHA_FILTER_PEAK;
 
             // Check if ON or OFF
             if (upper_params.find("OFF") != std::string::npos) {
@@ -110,21 +114,21 @@ radioform_error_t radioform_preset_parse_autoeq(
 
             // Determine filter type
             if (upper_params.find(" PK ") != std::string::npos || upper_params.find(" PK") != std::string::npos || upper_params.find(" PEAK") != std::string::npos) {
-                band.type = RADIOFORM_FILTER_PEAK;
+                band.type = KRISHA_FILTER_PEAK;
             } else if (upper_params.find(" LSC ") != std::string::npos || upper_params.find(" LSC") != std::string::npos ||
                        upper_params.find(" LS ") != std::string::npos || upper_params.find(" LS") != std::string::npos ||
                        upper_params.find(" LOW_SHELF") != std::string::npos) {
-                band.type = RADIOFORM_FILTER_LOW_SHELF;
+                band.type = KRISHA_FILTER_LOW_SHELF;
             } else if (upper_params.find(" HSC ") != std::string::npos || upper_params.find(" HSC") != std::string::npos ||
                        upper_params.find(" HS ") != std::string::npos || upper_params.find(" HS") != std::string::npos ||
                        upper_params.find(" HIGH_SHELF") != std::string::npos) {
-                band.type = RADIOFORM_FILTER_HIGH_SHELF;
+                band.type = KRISHA_FILTER_HIGH_SHELF;
             } else if (upper_params.find(" LP ") != std::string::npos || upper_params.find(" LP") != std::string::npos ||
                        upper_params.find(" LOW_PASS") != std::string::npos) {
-                band.type = RADIOFORM_FILTER_LOW_PASS;
+                band.type = KRISHA_FILTER_LOW_PASS;
             } else if (upper_params.find(" HP ") != std::string::npos || upper_params.find(" HP") != std::string::npos ||
                        upper_params.find(" HIGH_PASS") != std::string::npos) {
-                band.type = RADIOFORM_FILTER_HIGH_PASS;
+                band.type = KRISHA_FILTER_HIGH_PASS;
             }
 
             // Extract Fc
@@ -153,8 +157,8 @@ radioform_error_t radioform_preset_parse_autoeq(
 
     if (parsed_bands_count > 0) {
         preset->num_bands = parsed_bands_count;
-        return RADIOFORM_OK;
+        return KRISHA_OK;
     }
 
-    return RADIOFORM_ERROR_INVALID_PARAM; // No valid filters parsed
+    return KRISHA_ERROR_INVALID_PARAM; // No valid filters parsed
 }

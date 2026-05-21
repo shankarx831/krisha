@@ -1,3 +1,7 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 #ifndef MOCK_SPA_RAW_H
 #define MOCK_SPA_RAW_H
 

@@ -4,24 +4,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "RadioformHost",
+    name: "KrishaHost",
     platforms: [
         .macOS(.v13)
     ],
     targets: [
         .target(
-            name: "CRadioformAudio",
-            path: "Sources/CRadioformAudio",
+            name: "CKrishaAudio",
+            path: "Sources/CKrishaAudio",
             publicHeadersPath: "include"
         ),
         .target(
-            name: "CRadioformDSP",
-            path: "Sources/CRadioformDSP",
+            name: "CKrishaDSP",
+            path: "Sources/CKrishaDSP",
             publicHeadersPath: "include"
         ),
         .executableTarget(
-            name: "RadioformHost",
-            dependencies: ["CRadioformAudio", "CRadioformDSP"],
+            name: "KrishaHost",
+            dependencies: ["CKrishaAudio", "CKrishaDSP"],
             linkerSettings: [
                 .linkedFramework("CoreAudio"),
                 .linkedFramework("AudioToolbox"),
@@ -30,7 +30,7 @@ let package = Package(
                 .linkedLibrary("c++"),
                 .unsafeFlags([
                     "-L../dsp/build",
-                    "-lradioform_dsp"
+                    "-lkrisha_dsp"
                 ])
             ]
         ),

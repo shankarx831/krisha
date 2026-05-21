@@ -15,17 +15,17 @@ Application audio
             │
             ▼
 ┌──────────────────────────┐
-│ RadioformDriver.driver   │  <-- HAL Plugin (runs inside coreaudiod)
+│ KrishaDriver.driver   │  <-- HAL Plugin (runs inside coreaudiod)
 │                          │
 │  - OnWriteMixedOutput()  │
 │  - Linear interpolation  │
 │  - Ring buffer write     │
 └───────────┬──────────────┘
             │ shared memory (mmap)
-            │ /tmp/radioform-<uid>
+            │ /tmp/krisha-<uid>
             ▼
 ┌──────────────────────────┐
-│ RadioformHost            │  <-- Headless Swift Host Process
+│ KrishaHost            │  <-- Headless Swift Host Process
 │                          │
 │  - Ring buffer read      │
 │  - DSP engine run        │
@@ -36,7 +36,7 @@ Application audio
 ## Core Components
 
 1.  **Plugin Runtime (`packages/driver/src/Plugin.cpp`)**:
-    *   Creates output-only proxy devices matching desired devices listed in `/tmp/radioform-devices.txt`.
+    *   Creates output-only proxy devices matching desired devices listed in `/tmp/krisha-devices.txt`.
     *   Implements the `UniversalAudioHandler` for stream IO.
     *   Leverages the **`libASPL`** helper library to wrap the complex CoreAudio C API structures with high-level C++ objects.
 2.  **Shared Memory Ring Buffer (`packages/driver/include/RFSharedAudio.h`)**:

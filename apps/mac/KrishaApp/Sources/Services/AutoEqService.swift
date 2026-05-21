@@ -30,7 +30,7 @@ class AutoEqService: ObservableObject {
 
     private init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        cacheURL = appSupport.appendingPathComponent("Radioform").appendingPathComponent("autoeq_index.json")
+        cacheURL = appSupport.appendingPathComponent("Krisha").appendingPathComponent("autoeq_index.json")
         loadCachedIndex()
     }
 
@@ -58,7 +58,7 @@ class AutoEqService: ObservableObject {
 
         let url = URL(string: "https://api.github.com/repos/jaakkopasanen/AutoEq/git/trees/master?recursive=1")!
         var request = URLRequest(url: url)
-        request.setValue("RadioformApp/1.0.0 (macOS; Equalizer)", forHTTPHeaderField: "User-Agent")
+        request.setValue("KrishaApp/1.0.0 (macOS; Equalizer)", forHTTPHeaderField: "User-Agent")
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)

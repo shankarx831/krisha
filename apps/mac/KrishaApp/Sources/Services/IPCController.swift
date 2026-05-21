@@ -8,7 +8,7 @@ class IPCController {
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
-        ).first!.appendingPathComponent("Radioform")
+        ).first!.appendingPathComponent("Krisha")
 
         try? FileManager.default.createDirectory(
             at: appSupport,

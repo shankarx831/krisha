@@ -1,6 +1,6 @@
 import Foundation
 
-/// Filter types matching radioform_filter_type_t
+/// Filter types matching krisha_filter_type_t
 enum FilterType: Int, Codable, CaseIterable {
     case peak = 0
     case lowShelf = 1
@@ -35,7 +35,7 @@ enum FilterType: Int, Codable, CaseIterable {
     }
 }
 
-/// Single EQ band matching radioform_band_t
+/// Single EQ band matching krisha_band_t
 struct EQBand: Codable, Identifiable, Equatable {
     let id = UUID()
     var frequencyHz: Float       // 20-20000 Hz

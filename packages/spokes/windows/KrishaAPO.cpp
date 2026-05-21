@@ -1,5 +1,9 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
- * @file RadioformAPO.cpp
+ * @file KrishaAPO.cpp
  * @brief Windows Audio Processing Object (sAPO) spoke implementation
  */
 
@@ -11,11 +15,11 @@
 #include <cstring>
 #include <new>
 
-#include "radioform_dsp.h"
+#include "krisha_dsp.h"
 
-// Define a unique GUID for RadioformAPO class
+// Define a unique GUID for KrishaAPO class
 // {D8A9F63C-311D-4952-B35E-2BC90A093D87}
-static const GUID CLSID_RadioformAPO = {
+static const GUID CLSID_KrishaAPO = {
     0xd8a9f63c, 0x311d, 0x4952, { 0xb3, 0x5e, 0x2b, 0xc9, 0x0a, 0x09, 0x3d, 0x87 }
 };
 
@@ -24,27 +28,27 @@ static const GUID IID_IAudioProcessingObject = {
     0xFD27FF0A, 0x5EA0, 0x4F5C, { 0xB2, 0xD4, 0x8C, 0xA9, 0xD2, 0x5D, 0xCA, 0xE7 } // Mock IID
 };
 
-class RadioformAPO : public IAudioProcessingObject,
+class KrishaAPO : public IAudioProcessingObject,
                      public IAudioProcessingObjectConfiguration,
                      public IAudioProcessingObjectRT {
 private:
     std::atomic<uint32_t> m_u32RefCount;
-    radioform_dsp_engine_t* m_pEngine;
+    krisha_dsp_engine_t* m_pEngine;
     uint32_t m_u32SampleRate;
     uint32_t m_u32Channels;
     bool m_bIsLocked;
 
 public:
-    RadioformAPO() 
+    KrishaAPO() 
         : m_u32RefCount(1), 
           m_pEngine(nullptr), 
           m_u32SampleRate(48000), 
           m_u32Channels(2), 
           m_bIsLocked(false) {}
 
-    virtual ~RadioformAPO() {
+    virtual ~KrishaAPO() {
         if (m_pEngine) {
-            radioform_dsp_destroy(m_pEngine);
+            krisha_dsp_destroy(m_pEngine);
         }
     }
 
@@ -56,7 +60,7 @@ public:
         *ppvObject = nullptr;
 
         // Since COM uses multiple inheritance, we cast correctly to avoid pointer offset issues
-        if (IsEqualGUID(riid, CLSID_RadioformAPO)) {
+        if (IsEqualGUID(riid, CLSID_KrishaAPO)) {
             *ppvObject = static_cast<IUnknown*>(static_cast<IAudioProcessingObject*>(this));
         } else if (IsEqualGUID(riid, IID_IAudioProcessingObject)) {
             *ppvObject = static_cast<IAudioProcessingObject*>(this);
@@ -127,19 +131,19 @@ public:
 
         // Clean up previous engine
         if (m_pEngine) {
-            radioform_dsp_destroy(m_pEngine);
+            krisha_dsp_destroy(m_pEngine);
             m_pEngine = nullptr;
         }
 
         // Initialize cross-platform C++ DSP engine for the negotiated sample rate
-        m_pEngine = radioform_dsp_create(m_u32SampleRate);
+        m_pEngine = krisha_dsp_create(m_u32SampleRate);
         if (!m_pEngine) return E_FAIL;
 
         // Load a standard flat preset into the engine
-        radioform_preset_t preset;
-        radioform_dsp_preset_init_flat(&preset);
-        radioform_dsp_apply_preset(m_pEngine, &preset);
-        radioform_dsp_set_bypass(m_pEngine, false);
+        krisha_preset_t preset;
+        krisha_dsp_preset_init_flat(&preset);
+        krisha_dsp_apply_preset(m_pEngine, &preset);
+        krisha_dsp_set_bypass(m_pEngine, false);
 
         m_bIsLocked = true;
         return S_OK;
@@ -150,7 +154,7 @@ public:
 
         // Destroy the DSP engine context when unlocking
         if (m_pEngine) {
-            radioform_dsp_destroy(m_pEngine);
+            krisha_dsp_destroy(m_pEngine);
             m_pEngine = nullptr;
         }
 
@@ -179,8 +183,8 @@ public:
         if (u32FrameCount == 0) return;
 
         // Realtime processing using our high-performance frozen C++ DSP Core
-        if (m_pEngine && !radioform_dsp_get_bypass(m_pEngine)) {
-            radioform_dsp_process_interleaved(m_pEngine, pIn->pBuffer, pOut->pBuffer, u32FrameCount);
+        if (m_pEngine && !krisha_dsp_get_bypass(m_pEngine)) {
+            krisha_dsp_process_interleaved(m_pEngine, pIn->pBuffer, pOut->pBuffer, u32FrameCount);
         } else {
             // Passthrough bypass
             std::memcpy(pOut->pBuffer, pIn->pBuffer, u32FrameCount * m_u32Channels * sizeof(float));
@@ -192,9 +196,9 @@ public:
 };
 
 // COM class factory entry point
-extern "C" __attribute__((visibility("default"))) HRESULT CreateRadioformAPOInstance(void** ppvObject) {
+extern "C" __attribute__((visibility("default"))) HRESULT CreateKrishaAPOInstance(void** ppvObject) {
     if (!ppvObject) return E_POINTER;
-    RadioformAPO* pAPO = new (std::nothrow) RadioformAPO();
+    KrishaAPO* pAPO = new (std::nothrow) KrishaAPO();
     if (!pAPO) return E_FAIL;
     *ppvObject = static_cast<IAudioProcessingObject*>(pAPO);
     return S_OK;

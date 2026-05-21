@@ -1,11 +1,11 @@
 #!/bin/bash
-# Radioform HAL Driver Uninstallation Script
+# Krisha HAL Driver Uninstallation Script
 
 set -e
 
-INSTALL_PATH="/Library/Audio/Plug-Ins/HAL/RadioformDriver.driver"
+INSTALL_PATH="/Library/Audio/Plug-Ins/HAL/KrishaDriver.driver"
 
-echo "Radioform HAL Driver Uninstaller"
+echo "Krisha HAL Driver Uninstaller"
 echo "================================"
 
 # Check if installed

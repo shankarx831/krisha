@@ -49,4 +49,4 @@ jobs:
       - name: Execute DSP Unit Test Suite
         run: |
           cd packages/dsp/build
-          ./tests/radioform_dsp_tests
+          ./tests/krisha_dsp_tests

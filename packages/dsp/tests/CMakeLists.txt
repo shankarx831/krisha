@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.20)
 enable_testing()
 
 # Test executable
-add_executable(radioform_dsp_tests
+add_executable(krisha_dsp_tests
     test_main.cpp
     test_biquad.cpp
     test_smoothing.cpp
@@ -15,26 +15,26 @@ add_executable(radioform_dsp_tests
 )
 
 # Link against DSP library
-target_link_libraries(radioform_dsp_tests PRIVATE radioform_dsp)
+target_link_libraries(krisha_dsp_tests PRIVATE krisha_dsp)
 
 # Include test utilities
-target_include_directories(radioform_dsp_tests PRIVATE
+target_include_directories(krisha_dsp_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
 )
 
 # Compiler flags for tests
-target_compile_options(radioform_dsp_tests PRIVATE
+target_compile_options(krisha_dsp_tests PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
 # Add test to CTest
-add_test(NAME radioform_dsp_tests COMMAND radioform_dsp_tests)
+add_test(NAME krisha_dsp_tests COMMAND krisha_dsp_tests)
 
 # Set test properties
-set_tests_properties(radioform_dsp_tests PROPERTIES
+set_tests_properties(krisha_dsp_tests PROPERTIES
     TIMEOUT 60
     LABELS "unit"
 )
 
-message(STATUS "Test suite configured: radioform_dsp_tests")
+message(STATUS "Test suite configured: krisha_dsp_tests")

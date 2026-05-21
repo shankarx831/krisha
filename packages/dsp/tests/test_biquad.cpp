@@ -1,3 +1,7 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file test_biquad.cpp
  * @brief Tests for biquad filter implementation
@@ -6,7 +10,7 @@
 #include "test_utils.h"
 #include "biquad.h"
 
-using namespace radioform;
+using namespace krisha;
 using namespace dsp_test;
 
 TEST(biquad_passthrough_when_flat) {
@@ -38,11 +42,11 @@ TEST(biquad_impulse_response_peak_filter) {
     bq.init();
 
     // Create peak filter at 1kHz, +6dB, Q=1.0
-    radioform_band_t band;
+    krisha_band_t band;
     band.frequency_hz = 1000.0f;
     band.gain_db = 6.0f;
     band.q_factor = 1.0f;
-    band.type = RADIOFORM_FILTER_PEAK;
+    band.type = KRISHA_FILTER_PEAK;
     band.enabled = true;
 
     bq.setCoeffs(band, 48000.0f);
@@ -73,11 +77,11 @@ TEST(biquad_low_pass_attenuates_high_freq) {
     bq.init();
 
     // Create low-pass filter at 1kHz
-    radioform_band_t band;
+    krisha_band_t band;
     band.frequency_hz = 1000.0f;
     band.gain_db = 0.0f;
     band.q_factor = 0.707f; // Butterworth
-    band.type = RADIOFORM_FILTER_LOW_PASS;
+    band.type = KRISHA_FILTER_LOW_PASS;
     band.enabled = true;
 
     bq.setCoeffs(band, 48000.0f);
@@ -123,11 +127,11 @@ TEST(biquad_high_pass_attenuates_low_freq) {
     bq.init();
 
     // Create high-pass filter at 1kHz
-    radioform_band_t band;
+    krisha_band_t band;
     band.frequency_hz = 1000.0f;
     band.gain_db = 0.0f;
     band.q_factor = 0.707f;
-    band.type = RADIOFORM_FILTER_HIGH_PASS;
+    band.type = KRISHA_FILTER_HIGH_PASS;
     band.enabled = true;
 
     bq.setCoeffs(band, 48000.0f);
@@ -173,11 +177,11 @@ TEST(biquad_peak_filter_boosts_at_center_freq) {
     bq.init();
 
     // Create peak filter at 1kHz, +6dB
-    radioform_band_t band;
+    krisha_band_t band;
     band.frequency_hz = 1000.0f;
     band.gain_db = 6.0f;
     band.q_factor = 2.0f; // Narrow peak
-    band.type = RADIOFORM_FILTER_PEAK;
+    band.type = KRISHA_FILTER_PEAK;
     band.enabled = true;
 
     bq.setCoeffs(band, 48000.0f);
@@ -222,11 +226,11 @@ TEST(biquad_reset_clears_state) {
     Biquad bq;
     bq.init();
 
-    radioform_band_t band;
+    krisha_band_t band;
     band.frequency_hz = 1000.0f;
     band.gain_db = 6.0f;
     band.q_factor = 1.0f;
-    band.type = RADIOFORM_FILTER_PEAK;
+    band.type = KRISHA_FILTER_PEAK;
     band.enabled = true;
 
     bq.setCoeffs(band, 48000.0f);

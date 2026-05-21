@@ -1,16 +1,20 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file limiter.h
  * @brief Simple soft limiter to prevent clipping
  */
 
-#ifndef RADIOFORM_LIMITER_H
-#define RADIOFORM_LIMITER_H
+#ifndef KRISHA_LIMITER_H
+#define KRISHA_LIMITER_H
 
 #include <cstdint>
 #include <cmath>
 #include <algorithm>
 
-namespace radioform {
+namespace krisha {
 
 /**
  * @brief soft-knee limiter
@@ -121,6 +125,6 @@ private:
     float threshold_ = 1.0f;
 };
 
-} // namespace radioform
+} // namespace krisha
 
-#endif // RADIOFORM_LIMITER_H
+#endif // KRISHA_LIMITER_H

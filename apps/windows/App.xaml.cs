@@ -10,7 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace RadioformSpoke.Windows
+namespace KrishaSpoke.Windows
 {
     /// <summary>
     /// Interaction logic for App.xaml
@@ -20,7 +20,7 @@ namespace RadioformSpoke.Windows
         private NotifyIconWrapper _notifyIcon;
         private MemoryMappedFile _sharedMemory;
         private MemoryMappedViewAccessor _sharedAccessor;
-        private static readonly string SharedMemoryName = "Local\\RadioformDSPSharedMemory";
+        private static readonly string SharedMemoryName = "Local\\KrishaDSPSharedMemory";
         private const int SharedMemorySize = 4096; // 4KB configuration block
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
@@ -49,6 +49,10 @@ namespace RadioformSpoke.Windows
             // Create Tray Icon with zero polling Win32 event driven message loop
             _notifyIcon = new NotifyIconWrapper(this);
             _notifyIcon.Create();
+
+            // Display the WPF Settings window with Panic button
+            var settingsWindow = new SettingsWindow();
+            settingsWindow.Show();
 
             Debug.WriteLine("[KRISHA WinSpoke] Headless Tray Application Started. Idle CPU: 0.0%");
         }
@@ -93,7 +97,7 @@ namespace RadioformSpoke.Windows
             // Trigger Windows native Named Event to wake up the sAPO process immediately without polling
             try
             {
-                using (var changeEvent = EventWaitHandle.OpenExisting("Local\\RadioformPresetChangedEvent"))
+                using (var changeEvent = EventWaitHandle.OpenExisting("Local\\KrishaPresetChangedEvent"))
                 {
                     changeEvent.Set();
                 }
@@ -102,6 +106,71 @@ namespace RadioformSpoke.Windows
             {
                 // Named event might not be created if audiodg.exe isn't actively running, ignore
             }
+        }
+
+        public static void RunUninstallScript()
+        {
+            try
+            {
+                string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Manage_sAPO.ps1");
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" -Uninstall",
+                    Verb = "runas", // Requests administrative elevation
+                    UseShellExecute = true
+                };
+                Process.Start(psi);
+                Application.Current.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Uninstallation failed to start: {ex.Message}", "KRISHA Panic Uninstall", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Programmatic settings window containing safety uninstaller button.
+    /// </summary>
+    public class SettingsWindow : Window
+    {
+        public SettingsWindow()
+        {
+            Title = "KRISHA Settings & Failsafes";
+            Width = 400;
+            Height = 220;
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            Background = new SolidColorBrush(Color.FromRgb(31, 31, 31));
+            ResizeMode = ResizeMode.NoResize;
+
+            StackPanel panel = new StackPanel { Margin = new Thickness(20) };
+
+            Label titleLabel = new Label
+            {
+                Content = "KRISHA Universal Settings",
+                Foreground = Brushes.White,
+                FontSize = 18,
+                FontWeight = FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 20)
+            };
+            panel.Children.Add(titleLabel);
+
+            Button btnUninstall = new Button
+            {
+                Content = "Uninstall Audio Driver (Panic Button)",
+                Background = new SolidColorBrush(Color.FromRgb(255, 59, 48)),
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.Bold,
+                Padding = new Thickness(12),
+                Margin = new Thickness(0, 10, 0, 10),
+                BorderThickness = new Thickness(0)
+            };
+            btnUninstall.Click += (s, e) => App.RunUninstallScript();
+            panel.Children.Add(btnUninstall);
+
+            Content = panel;
         }
     }
 

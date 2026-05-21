@@ -1,8 +1,8 @@
 /**
- * Swift Usage Example for Radioform DSP Bridge
+ * Swift Usage Example for Krisha DSP Bridge
  *
  * This demonstrates how to use the Objective-C++ bridge from Swift.
- * Add RadioformDSPEngine.h to your bridging header to use these APIs.
+ * Add KrishaDSPEngine.h to your bridging header to use these APIs.
  */
 
 import Foundation
@@ -13,10 +13,10 @@ import Foundation
 
 func example1_BasicSetup() throws {
     // Create engine with 48kHz sample rate
-    let engine = try RadioformDSPEngine(sampleRate: 48000)
+    let engine = try KrishaDSPEngine(sampleRate: 48000)
 
     // Apply a flat preset (transparent processing)
-    let preset = RadioformPreset.flatPreset()
+    let preset = KrishaPreset.flatPreset()
     try engine.apply(preset)
 
     print("Engine created and flat preset applied")
@@ -27,17 +27,17 @@ func example1_BasicSetup() throws {
 // ============================================================================
 
 func example2_CustomPreset() throws {
-    let engine = try RadioformDSPEngine(sampleRate: 48000)
+    let engine = try KrishaDSPEngine(sampleRate: 48000)
 
     // Create a "Bass Boost" preset
-    let bassShelf = RadioformBand(
+    let bassShelf = KrishaBand(
         frequency: 100.0,    // 100 Hz
         gain: 6.0,           // +6 dB boost
         qFactor: 0.707,      // Standard shelf slope
         filterType: .lowShelf
     )
 
-    let preset = RadioformPreset.preset(
+    let preset = KrishaPreset.preset(
         withName: "Bass Boost",
         bands: [bassShelf]
     )
@@ -53,15 +53,15 @@ func example2_CustomPreset() throws {
 // ============================================================================
 
 func example3_GraphicEQ() throws {
-    let engine = try RadioformDSPEngine(sampleRate: 48000)
+    let engine = try KrishaDSPEngine(sampleRate: 48000)
 
     // Standard 10-band graphic EQ frequencies
     let frequencies: [Float] = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
     let gains: [Float] = [3, 2, 0, -2, -3, -2, 0, 2, 4, 3] // "V-shaped" curve
 
-    var bands: [RadioformBand] = []
+    var bands: [KrishaBand] = []
     for (freq, gain) in zip(frequencies, gains) {
-        let band = RadioformBand(
+        let band = KrishaBand(
             frequency: freq,
             gain: gain,
             qFactor: 1.0,
@@ -70,7 +70,7 @@ func example3_GraphicEQ() throws {
         bands.append(band)
     }
 
-    let preset = RadioformPreset.preset(withName: "V-Shaped", bands: bands)
+    let preset = KrishaPreset.preset(withName: "V-Shaped", bands: bands)
     try engine.apply(preset)
     print("10-band graphic EQ applied")
 }
@@ -80,11 +80,11 @@ func example3_GraphicEQ() throws {
 // ============================================================================
 
 func example4_ProcessAudio() throws {
-    let engine = try RadioformDSPEngine(sampleRate: 48000)
+    let engine = try KrishaDSPEngine(sampleRate: 48000)
 
     // Apply some EQ
-    let band = RadioformBand(frequency: 1000, gain: 6.0, qFactor: 2.0, filterType: .peak)
-    let preset = RadioformPreset.preset(withName: "Test", bands: [band])
+    let band = KrishaBand(frequency: 1000, gain: 6.0, qFactor: 2.0, filterType: .peak)
+    let preset = KrishaPreset.preset(withName: "Test", bands: [band])
     try engine.apply(preset)
 
     // Allocate audio buffers (512 frames stereo)
@@ -115,18 +115,18 @@ func example4_ProcessAudio() throws {
 // ============================================================================
 
 class AudioProcessor {
-    let engine: RadioformDSPEngine
+    let engine: KrishaDSPEngine
 
     init(sampleRate: UInt32 = 48000) throws {
-        engine = try RadioformDSPEngine(sampleRate: sampleRate)
+        engine = try KrishaDSPEngine(sampleRate: sampleRate)
 
         // Set up initial preset
         let bands = [
-            RadioformBand(frequency: 100, gain: 0, qFactor: 0.707, filterType: .lowShelf),
-            RadioformBand(frequency: 1000, gain: 0, qFactor: 1.0, filterType: .peak),
-            RadioformBand(frequency: 8000, gain: 0, qFactor: 0.707, filterType: .highShelf)
+            KrishaBand(frequency: 100, gain: 0, qFactor: 0.707, filterType: .lowShelf),
+            KrishaBand(frequency: 1000, gain: 0, qFactor: 1.0, filterType: .peak),
+            KrishaBand(frequency: 8000, gain: 0, qFactor: 0.707, filterType: .highShelf)
         ]
-        let preset = RadioformPreset.preset(withName: "Dynamic EQ", bands: bands)
+        let preset = KrishaPreset.preset(withName: "Dynamic EQ", bands: bands)
         try engine.apply(preset)
     }
 
@@ -169,7 +169,7 @@ class AudioProcessor {
 // ============================================================================
 
 func example6_Statistics() throws {
-    let engine = try RadioformDSPEngine(sampleRate: 48000)
+    let engine = try KrishaDSPEngine(sampleRate: 48000)
 
     // Process some audio...
     let frameCount: UInt32 = 512
@@ -191,7 +191,7 @@ func example6_Statistics() throws {
 func example7_ErrorHandling() {
     do {
         // Invalid sample rate
-        let engine = try RadioformDSPEngine(sampleRate: 1000)
+        let engine = try KrishaDSPEngine(sampleRate: 1000)
         print("Should not reach here")
     } catch let error as NSError {
         print("Error creating engine: \(error.localizedDescription)")
@@ -200,11 +200,11 @@ func example7_ErrorHandling() {
 
     // Valid engine
     do {
-        let engine = try RadioformDSPEngine(sampleRate: 48000)
+        let engine = try KrishaDSPEngine(sampleRate: 48000)
 
         // Invalid preset (frequency out of range)
-        let preset = RadioformPreset.flatPreset()
-        let badBand = RadioformBand(
+        let preset = KrishaPreset.flatPreset()
+        let badBand = KrishaBand(
             frequency: 30000,  // Too high!
             gain: 0,
             qFactor: 1.0,
@@ -228,7 +228,7 @@ func example7_ErrorHandling() {
 // ============================================================================
 
 class PresetManager {
-    private var presets: [String: RadioformPreset] = [:]
+    private var presets: [String: KrishaPreset] = [:]
 
     init() {
         // Add default presets
@@ -238,38 +238,38 @@ class PresetManager {
         presets["Vocal Enhance"] = createVocalEnhance()
     }
 
-    func createBassBoost() -> RadioformPreset {
+    func createBassBoost() -> KrishaPreset {
         let bands = [
-            RadioformBand(frequency: 60, gain: 8, qFactor: 0.707, filterType: .lowShelf),
-            RadioformBand(frequency: 200, gain: 3, qFactor: 1.0, filterType: .peak)
+            KrishaBand(frequency: 60, gain: 8, qFactor: 0.707, filterType: .lowShelf),
+            KrishaBand(frequency: 200, gain: 3, qFactor: 1.0, filterType: .peak)
         ]
-        return RadioformPreset.preset(withName: "Bass Boost", bands: bands)
+        return KrishaPreset.preset(withName: "Bass Boost", bands: bands)
     }
 
-    func createTrebleBoost() -> RadioformPreset {
+    func createTrebleBoost() -> KrishaPreset {
         let bands = [
-            RadioformBand(frequency: 8000, gain: 6, qFactor: 0.707, filterType: .highShelf)
+            KrishaBand(frequency: 8000, gain: 6, qFactor: 0.707, filterType: .highShelf)
         ]
-        return RadioformPreset.preset(withName: "Treble Boost", bands: bands)
+        return KrishaPreset.preset(withName: "Treble Boost", bands: bands)
     }
 
-    func createVocalEnhance() -> RadioformPreset {
+    func createVocalEnhance() -> KrishaPreset {
         let bands = [
-            RadioformBand(frequency: 200, gain: -3, qFactor: 1.0, filterType: .highPass),
-            RadioformBand(frequency: 3000, gain: 4, qFactor: 2.0, filterType: .peak),
-            RadioformBand(frequency: 8000, gain: -2, qFactor: 1.0, filterType: .peak)
+            KrishaBand(frequency: 200, gain: -3, qFactor: 1.0, filterType: .highPass),
+            KrishaBand(frequency: 3000, gain: 4, qFactor: 2.0, filterType: .peak),
+            KrishaBand(frequency: 8000, gain: -2, qFactor: 1.0, filterType: .peak)
         ]
-        let preset = RadioformPreset.preset(withName: "Vocal Enhance", bands: bands)
+        let preset = KrishaPreset.preset(withName: "Vocal Enhance", bands: bands)
         preset.limiterEnabled = true
         return preset
     }
 
-    func getPreset(_ name: String) -> RadioformPreset? {
+    func getPreset(_ name: String) -> KrishaPreset? {
         return presets[name]
     }
 
-    func savePreset(_ preset: RadioformPreset, name: String) {
-        presets[name] = preset.copy() as? RadioformPreset
+    func savePreset(_ preset: KrishaPreset, name: String) {
+        presets[name] = preset.copy() as? KrishaPreset
     }
 }
 
@@ -301,8 +301,8 @@ class PresetManager {
  - No heap allocations in audio processing path
 
  INTEGRATION:
- 1. Add RadioformDSPEngine.h to your bridging header
- 2. Link libradioform_dsp.a and libradioform_dsp_bridge.a
+ 1. Add KrishaDSPEngine.h to your bridging header
+ 2. Link libkrisha_dsp.a and libkrisha_dsp_bridge.a
  3. Create engine in your audio setup code
  4. Call process() from your audio callback
  5. Update parameters from UI thread as needed

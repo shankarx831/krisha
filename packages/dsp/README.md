@@ -1,16 +1,16 @@
-# Radioform DSP Library
+# Krisha DSP Library
 
-Digital signal processing core for Radioform. The library provides a C ABI (`include/radioform_dsp.h`) over a C++ implementation (`src/`) and an Objective-C++ bridge (`bridge/`) for Swift integration.
+Digital signal processing core for Krisha. The library provides a C ABI (`include/krisha_dsp.h`) over a C++ implementation (`src/`) and an Objective-C++ bridge (`bridge/`) for Swift integration.
 
 ## Features
 
-- 10-band parametric EQ (`RADIOFORM_MAX_BANDS = 10`)
+- 10-band parametric EQ (`KRISHA_MAX_BANDS = 10`)
 - Seven filter types: peak, low shelf, high shelf, low pass, high pass, notch, band pass
 - Stereo processing in interleaved and planar formats
 - Preamp control and optional soft limiter
 - DC blocker stage to reduce offset buildup
 - C ABI with POD types for C / ObjC++ / Swift interop
-- Objective-C++ wrapper (`RadioformDSPEngine`) for Foundation-friendly Swift usage
+- Objective-C++ wrapper (`KrishaDSPEngine`) for Foundation-friendly Swift usage
 
 ## Architecture
 
@@ -18,10 +18,10 @@ Digital signal processing core for Radioform. The library provides a C ABI (`inc
 Swift App
     |
     v
-RadioformDSPEngine (ObjC++)   bridge/RadioformDSPEngine.{h,mm}
+KrishaDSPEngine (ObjC++)   bridge/KrishaDSPEngine.{h,mm}
     |
     v
-C API                         include/radioform_dsp.h
+C API                         include/krisha_dsp.h
     |
     v
 C++ Engine                    src/engine.cpp + filter/smoother/limiter modules
@@ -32,8 +32,8 @@ C++ Engine                    src/engine.cpp + filter/smoother/limiter modules
 ```
 packages/dsp/
 ├── include/
-│   ├── radioform_types.h
-│   └── radioform_dsp.h
+│   ├── krisha_types.h
+│   └── krisha_dsp.h
 ├── src/
 │   ├── engine.cpp
 │   ├── biquad.h / biquad.cpp
@@ -44,8 +44,8 @@ packages/dsp/
 │   ├── preset.cpp
 │   └── version.cpp
 ├── bridge/
-│   ├── RadioformDSPEngine.h
-│   ├── RadioformDSPEngine.mm
+│   ├── KrishaDSPEngine.h
+│   ├── KrishaDSPEngine.mm
 │   ├── SwiftUsageExample.swift
 │   └── README.md
 ├── tests/
@@ -74,7 +74,7 @@ cmake --build build
 ### Run Tests
 
 ```bash
-./build/tests/radioform_dsp_tests
+./build/tests/krisha_dsp_tests
 ```
 
 ### Process WAV Files
@@ -90,10 +90,10 @@ cmake --build build
 See `bridge/SwiftUsageExample.swift` for examples.
 
 ```swift
-let engine = try RadioformDSPEngine(sampleRate: 48000)
+let engine = try KrishaDSPEngine(sampleRate: 48000)
 
-let band = RadioformBand(frequency: 100, gain: 6.0, qFactor: 0.707, filterType: .lowShelf)
-let preset = RadioformPreset.preset(withName: "Bass Boost", bands: [band])
+let band = KrishaBand(frequency: 100, gain: 6.0, qFactor: 0.707, filterType: .lowShelf)
+let preset = KrishaPreset.preset(withName: "Bass Boost", bands: [band])
 try engine.apply(preset)
 
 engine.processInterleaved(inputBuffer, output: &outputBuffer, frameCount: 512)
@@ -103,11 +103,11 @@ engine.bypass = true
 
 ## Technical Specifications
 
-- Supported sample rate range: 8,000 Hz to 384,000 Hz (`radioform_dsp_create` validation)
+- Supported sample rate range: 8,000 Hz to 384,000 Hz (`krisha_dsp_create` validation)
 - Sample format: 32-bit float
 - Channels: stereo (left/right)
-- Supported buffer layout: interleaved (`radioform_dsp_process_interleaved`)
-- Supported buffer layout: planar (`radioform_dsp_process_planar`)
+- Supported buffer layout: interleaved (`krisha_dsp_process_interleaved`)
+- Supported buffer layout: planar (`krisha_dsp_process_planar`)
 - EQ gain range (preset validation): -12 dB to +12 dB
 - EQ frequency range (preset validation): 20 Hz to 20,000 Hz
 - EQ Q range (preset validation): 0.1 to 10.0
@@ -125,9 +125,9 @@ engine.bypass = true
 
 ## Realtime/Threading Notes
 
-- `radioform_dsp_process_interleaved` and `radioform_dsp_process_planar` are implemented without heap allocation.
+- `krisha_dsp_process_interleaved` and `krisha_dsp_process_planar` are implemented without heap allocation.
 - Bypass state is controlled via `std::atomic<bool>`.
-- Use the API thread-safety contract in `include/radioform_dsp.h` as the authoritative reference for calling patterns.
+- Use the API thread-safety contract in `include/krisha_dsp.h` as the authoritative reference for calling patterns.
 
 ## Build Options
 
@@ -141,8 +141,8 @@ cmake -B build -DBUILD_TOOLS=OFF
 
 ## Documentation
 
-- `include/radioform_dsp.h` — public C API contract
-- `include/radioform_types.h` — public types and enums
+- `include/krisha_dsp.h` — public C API contract
+- `include/krisha_types.h` — public types and enums
 - `bridge/README.md` — Objective-C++ bridge details
 - `bridge/SwiftUsageExample.swift` — Swift usage patterns
 - `tests/README.md` — test suite overview

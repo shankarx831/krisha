@@ -1,3 +1,7 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file test_utils.h
  * @brief Testing utilities and mini test framework
@@ -79,7 +83,7 @@ static std::vector<std::pair<std::string, std::function<void()>>>& get_test_regi
 
 inline int run_all_tests() {
     std::cout << "\n========================================\n";
-    std::cout << "Running Radioform DSP Test Suite\n";
+    std::cout << "Running Krisha DSP Test Suite\n";
     std::cout << "========================================\n\n";
 
     auto& tests = get_test_registry();

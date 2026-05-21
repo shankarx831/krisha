@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(radioform_dsp VERSION 1.0.0 LANGUAGES C CXX)
+project(krisha_dsp VERSION 1.0.0 LANGUAGES C CXX)
 
 # C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -50,14 +50,14 @@ if(APPLE)
 endif()
 
 # ============================================================================
-# Radioform DSP Library
+# Krisha DSP Library
 # ============================================================================
 
 # Public headers
 set(PUBLIC_HEADERS
-    include/radioform_types.h
-    include/radioform_dsp.h
-    include/radioform_universal.h
+    include/krisha_types.h
+    include/krisha_dsp.h
+    include/krisha_universal.h
 )
 
 # Source files
@@ -72,13 +72,13 @@ set(SOURCES
 )
 
 # Create static library
-add_library(radioform_dsp STATIC
+add_library(krisha_dsp STATIC
     ${SOURCES}
     ${PUBLIC_HEADERS}
 )
 
 # Include directories
-target_include_directories(radioform_dsp
+target_include_directories(krisha_dsp
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
@@ -87,14 +87,14 @@ target_include_directories(radioform_dsp
 )
 
 # Compiler definitions
-target_compile_definitions(radioform_dsp PRIVATE
-    RADIOFORM_DSP_VERSION="${PROJECT_VERSION}"
+target_compile_definitions(krisha_dsp PRIVATE
+    KRISHA_DSP_VERSION="${PROJECT_VERSION}"
 )
 
 # Platform-specific settings
 if(APPLE)
     # Link Accelerate framework for optimized math
-    target_link_libraries(radioform_dsp PRIVATE "-framework Accelerate")
+    target_link_libraries(krisha_dsp PRIVATE "-framework Accelerate")
 endif()
 
 # ============================================================================
@@ -132,13 +132,13 @@ endif()
 # Installation (optional)
 # ============================================================================
 
-install(TARGETS radioform_dsp
+install(TARGETS krisha_dsp
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
 
 install(FILES ${PUBLIC_HEADERS}
-    DESTINATION include/radioform
+    DESTINATION include/krisha
 )
 
 # ============================================================================
@@ -146,7 +146,7 @@ install(FILES ${PUBLIC_HEADERS}
 # ============================================================================
 
 message(STATUS "")
-message(STATUS "Radioform DSP Configuration:")
+message(STATUS "Krisha DSP Configuration:")
 message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C++ standard: ${CMAKE_CXX_STANDARD}")

@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
-namespace RadioformSpoke.Windows
+namespace KrishaSpoke.Windows
 {
     /// <summary>
     /// Thread-safe C# wrapper that P/Invokes into the native C++ DSP core library
@@ -10,20 +10,20 @@ namespace RadioformSpoke.Windows
     /// </summary>
     public class EQGraph
     {
-        private const string DllName = "radioform_apo";
+        private const string DllName = "krisha_apo";
 
         // ============================================================================
         // P/Invoke Signatures
         // ============================================================================
 
-        [DllImport(DllName, EntryPoint = "radioform_dsp_create", CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr RadioformDspCreate(uint sampleRate);
+        [DllImport(DllName, EntryPoint = "krisha_dsp_create", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr KrishaDspCreate(uint sampleRate);
 
-        [DllImport(DllName, EntryPoint = "radioform_dsp_destroy", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void RadioformDspDestroy(IntPtr engine);
+        [DllImport(DllName, EntryPoint = "krisha_dsp_destroy", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void KrishaDspDestroy(IntPtr engine);
 
-        [DllImport(DllName, EntryPoint = "radioform_dsp_get_magnitude_at_frequency", CallingConvention = CallingConvention.Cdecl)]
-        private static extern float RadioformDspGetMagnitudeAtFrequency(IntPtr engine, float frequencyHz, bool leftChannel);
+        [DllImport(DllName, EntryPoint = "krisha_dsp_get_magnitude_at_frequency", CallingConvention = CallingConvention.Cdecl)]
+        private static extern float KrishaDspGetMagnitudeAtFrequency(IntPtr engine, float frequencyHz, bool leftChannel);
 
         // ============================================================================
         // Fields & Properties
@@ -42,7 +42,7 @@ namespace RadioformSpoke.Windows
             // Create a transient DSP engine for off-thread graph evaluation
             lock (_lock)
             {
-                _tempEngine = RadioformDspCreate(sampleRate);
+                _tempEngine = KrishaDspCreate(sampleRate);
             }
 
             _logFrequencies = new float[StepsCount];
@@ -58,7 +58,7 @@ namespace RadioformSpoke.Windows
             {
                 if (_tempEngine != IntPtr.Zero)
                 {
-                    RadioformDspDestroy(_tempEngine);
+                    KrishaDspDestroy(_tempEngine);
                 }
             }
         }
@@ -96,8 +96,8 @@ namespace RadioformSpoke.Windows
                     for (int i = 0; i < StepsCount; i++)
                     {
                         float freq = _logFrequencies[i];
-                        leftTemp[i] = RadioformDspGetMagnitudeAtFrequency(_tempEngine, freq, true);
-                        rightTemp[i] = RadioformDspGetMagnitudeAtFrequency(_tempEngine, freq, false);
+                        leftTemp[i] = KrishaDspGetMagnitudeAtFrequency(_tempEngine, freq, true);
+                        rightTemp[i] = KrishaDspGetMagnitudeAtFrequency(_tempEngine, freq, false);
                     }
 
                     // Atomic swap to avoid UI thread race conditions

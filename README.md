@@ -1,12 +1,12 @@
 # KRISHA
 **Kernel-level Reactive Integration for System Headless Audio**
-> Architected and Developed by Shankar | Powered by the Radioform C++ DSP Engine
+> Architected and Developed by Shankar | Powered by the Krisha C++ DSP Engine
 
-[![DSP Unit Tests](https://github.com/torteous44/radioform/actions/workflows/dsp_tests.yml/badge.svg)](https://github.com/torteous44/radioform/actions/workflows/dsp_tests.yml)
-[![Build Spokes](https://github.com/torteous44/radioform/actions/workflows/build_spokes.yml/badge.svg)](https://github.com/torteous44/radioform/actions/workflows/build_spokes.yml)
+[![DSP Unit Tests](https://github.com/torteous44/krisha/actions/workflows/dsp_tests.yml/badge.svg)](https://github.com/torteous44/krisha/actions/workflows/dsp_tests.yml)
+[![Build Spokes](https://github.com/torteous44/krisha/actions/workflows/build_spokes.yml/badge.svg)](https://github.com/torteous44/krisha/actions/workflows/build_spokes.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-KRISHA is an industry-grade, system-wide parametric equalizer engineered for extreme battery efficiency (**0.0% idle CPU overhead**) and ultra-low latency. Expanding upon the core Radioform C++ DSP Engine, Shankar designed and developed KRISHA as a 0.0% idle CPU, cross-platform hub-and-spoke architecture featuring native Windows, macOS, Linux, and Android drivers.
+KRISHA is an industry-grade, system-wide parametric equalizer engineered for extreme battery efficiency (**0.0% idle CPU overhead**) and ultra-low latency. Expanding upon the core Krisha C++ DSP Engine, Shankar designed and developed KRISHA as a 0.0% idle CPU, cross-platform hub-and-spoke architecture featuring native Windows, macOS, Linux, and Android drivers.
 
 ---
 
@@ -57,7 +57,7 @@ graph TD
 
 ### 2. The Platform Audio Spokes
 *   **macOS Spoke**: Leverages the macOS CoreAudio Hardware Abstraction Layer (HAL) plugin architecture to construct system-wide virtual output proxies communicating via a lock-free shared memory ring buffer.
-*   **Windows sAPO Spoke**: Implements native `IAudioProcessingObject` and `IAudioProcessingObjectRT` COM interfaces in `RadioformAPO.cpp` to process IEEE float streams directly inside Windows `audiodg.exe`.
+*   **Windows sAPO Spoke**: Implements native `IAudioProcessingObject` and `IAudioProcessingObjectRT` COM interfaces in `KrishaAPO.cpp` to process IEEE float streams directly inside Windows `audiodg.exe`.
 *   **Linux PipeWire Spoke**: Creates a real-time virtual sink daemon at `packages/spokes/linux/main.c` that hooks into PipeWire streams with zero allocations or blocking system calls inside the hot audio thread.
 *   **Android JNI Spoke**: Connects parsed AutoEq arrays straight to Android's high-performance `DynamicsProcessing` engine using highly efficient JNI boundaries.
 
@@ -79,7 +79,7 @@ Conventional equalizers utilize dispatch timers or periodic polls to monitor pre
 ## 📈 Advanced DSP & Algorithmic Optimizations
 
 1.  **Zero-Branching 0.0 dB Bypass**: Precalculates and caches active biquad indices during preset updates. Flat or 0.0 dB bands are completely skipped in the render loop without branching overhead, eliminating CPU branch misprediction penalties.
-2.  **Hardware Denormal Suppression**: Denormal (subnormal) floating-point numbers can cause 10x-100x instruction stalls on modern x86/ARM CPUs. Radioform enables hardware Flush-to-Zero (FTZ) and Denormals-Are-Zero (DAZ) CPU flags during thread initialization:
+2.  **Hardware Denormal Suppression**: Denormal (subnormal) floating-point numbers can cause 10x-100x instruction stalls on modern x86/ARM CPUs. Krisha enables hardware Flush-to-Zero (FTZ) and Denormals-Are-Zero (DAZ) CPU flags during thread initialization:
     ```cpp
     #if defined(__x86_64__) || defined(_M_X64)
     _mm_setcsr(_mm_getcsr() | 0x8040); // FTZ & DAZ
@@ -92,7 +92,7 @@ Conventional equalizers utilize dispatch timers or periodic polls to monitor pre
 ## 📂 Repository Layout
 
 ```
-radioform/
+krisha/
 ├── apps/                 # Headless Native UI applications
 │   ├── mac/              # macOS SwiftUI Menu Bar app
 │   ├── windows/          # WinUI 3 Tray app & P/Invoke graph
@@ -124,12 +124,12 @@ mkdir -p build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build .
 # Execute the 39 unit tests
-./tests/radioform_dsp_tests
+./tests/krisha_dsp_tests
 ```
 
 ### 2. Build macOS Release Bundle (`.app` + virtual HAL Driver)
 ```bash
-# Performs versioning, compiles C++ core, HAL drivers, Swift Host, and packages dist/Radioform.app
+# Performs versioning, compiles C++ core, HAL drivers, Swift Host, and packages dist/Krisha.app
 make build
 ```
 

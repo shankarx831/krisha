@@ -1,3 +1,7 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file test_smoothing.cpp
  * @brief Tests for parameter smoothing
@@ -6,7 +10,7 @@
 #include "test_utils.h"
 #include "smoothing.h"
 
-using namespace radioform;
+using namespace krisha;
 
 TEST(smoother_initialization) {
     ParameterSmoother smoother;

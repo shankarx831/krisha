@@ -40,6 +40,6 @@ export default function robots(): MetadataRoute.Robots {
         allow: "/",
       },
     ],
-    sitemap: "https://radioform.app/sitemap.xml",
+    sitemap: "https://krisha.app/sitemap.xml",
   };
 }

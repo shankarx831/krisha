@@ -1,12 +1,12 @@
 #!/bin/bash
-# Radioform HAL Driver Installation Script
+# Krisha HAL Driver Installation Script
 
 set -e
 
-DRIVER_PATH="./build/RadioformDriver.driver"
-INSTALL_PATH="/Library/Audio/Plug-Ins/HAL/RadioformDriver.driver"
+DRIVER_PATH="./build/KrishaDriver.driver"
+INSTALL_PATH="/Library/Audio/Plug-Ins/HAL/KrishaDriver.driver"
 
-echo "Radioform HAL Driver Installer"
+echo "Krisha HAL Driver Installer"
 echo "=============================="
 
 # Check if driver was built
@@ -35,4 +35,4 @@ echo "IMPORTANT: You must restart coreaudiod for changes to take effect:"
 echo "  sudo killall coreaudiod"
 echo ""
 echo "WARNING: This will interrupt all audio playback (~2 seconds)."
-echo "Make sure Radioform is NOT selected as the default output device before restarting."
+echo "Make sure Krisha is NOT selected as the default output device before restarting."

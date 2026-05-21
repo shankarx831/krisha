@@ -1,6 +1,6 @@
 import Foundation
 
-/// Manages version reading and comparison across Radioform components
+/// Manages version reading and comparison across Krisha components
 struct VersionManager {
 
 	// MARK: - App Version
@@ -19,7 +19,7 @@ struct VersionManager {
 
 	/// Get installed driver version from /Library/Audio/Plug-Ins/HAL/
 	static func installedDriverVersion() -> String? {
-		let driverPath = "/Library/Audio/Plug-Ins/HAL/RadioformDriver.driver/Contents/Info.plist"
+		let driverPath = "/Library/Audio/Plug-Ins/HAL/KrishaDriver.driver/Contents/Info.plist"
 
 		guard FileManager.default.fileExists(atPath: driverPath),
 			  let plistData = FileManager.default.contents(atPath: driverPath),
@@ -61,7 +61,7 @@ struct VersionManager {
 
 	/// Check if driver is installed at system level
 	static func isDriverInstalled() -> Bool {
-		let driverPath = "/Library/Audio/Plug-Ins/HAL/RadioformDriver.driver"
+		let driverPath = "/Library/Audio/Plug-Ins/HAL/KrishaDriver.driver"
 		return FileManager.default.fileExists(atPath: driverPath)
 	}
 
@@ -107,14 +107,14 @@ struct VersionManager {
 	private static func findBundledDriver() -> String? {
 		// Search in main bundle resources
 		if let bundlePath = Bundle.main.resourcePath {
-			let driverPath = "\(bundlePath)/RadioformDriver.driver"
+			let driverPath = "\(bundlePath)/KrishaDriver.driver"
 			if FileManager.default.fileExists(atPath: driverPath) {
 				return driverPath
 			}
 		}
 
 		// Search using Bundle API
-		if let resourcePath = Bundle.main.path(forResource: "RadioformDriver", ofType: "driver") {
+		if let resourcePath = Bundle.main.path(forResource: "KrishaDriver", ofType: "driver") {
 			return resourcePath
 		}
 
@@ -122,7 +122,7 @@ struct VersionManager {
 		let fm = FileManager.default
 		if let currentPath = Bundle.main.executablePath {
 			let projectRoot = (currentPath as NSString).deletingLastPathComponent
-				.appending("/../../../../../packages/driver/build/RadioformDriver.driver")
+				.appending("/../../../../../packages/driver/build/KrishaDriver.driver")
 
 			let normalizedPath = (projectRoot as NSString).standardizingPath
 			if fm.fileExists(atPath: normalizedPath) {

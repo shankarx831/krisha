@@ -1,13 +1,13 @@
 import SwiftUI
 import Combine
-import CRadioformDSP
+import CKrishaDSP
 
 class LiveEQGraphViewModel: ObservableObject {
     @Published var leftPathPoints: [CGPoint] = []
     @Published var rightPathPoints: [CGPoint] = []
     
     private var cancellables = Set<AnyCancellable>()
-    private let calculationQueue = DispatchQueue(label: "com.radioform.eq-graph-calc", qos: .userInteractive)
+    private let calculationQueue = DispatchQueue(label: "com.krisha.eq-graph-calc", qos: .userInteractive)
     
     init(presetManager: PresetManager) {
         // Observe all published values in PresetManager that affect the curve
@@ -63,13 +63,13 @@ class LiveEQGraphViewModel: ObservableObject {
             }
             
             // Instantiate transient offline DSP engine to evaluate the mathematical curve
-            guard let offlineEngine = radioform_dsp_create(48000) else { return }
+            guard let offlineEngine = krisha_dsp_create(48000) else { return }
             defer {
-                radioform_dsp_destroy(offlineEngine)
+                krisha_dsp_destroy(offlineEngine)
             }
             
-            var preset = radioform_preset_t()
-            radioform_dsp_preset_init_flat(&preset)
+            var preset = krisha_preset_t()
+            krisha_dsp_preset_init_flat(&preset)
             preset.num_bands = 10
             preset.preamp_db = preampDb
             preset.preamp_left_db = preampLeftDb
@@ -77,25 +77,29 @@ class LiveEQGraphViewModel: ObservableObject {
             preset.limiter_enabled = limiterEnabled
             preset.limiter_threshold_db = limiterThresholdDb
             
-            for i in 0..<10 {
-                let gain = isEnabled ? bands[i] : 0.0
-                preset.bands[i].frequency_hz = frequencies[i]
-                preset.bands[i].gain_db = gain
-                preset.bands[i].q_factor = qFactors[i]
-                preset.bands[i].type = radioform_filter_type_t(UInt32(filterTypes[i].rawValue))
-                preset.bands[i].enabled = isEnabled && (abs(gain) > 0.01)
+            withUnsafeMutablePointer(to: &preset.bands) { bandsPtr in
+                let rawPtr = UnsafeMutableRawPointer(bandsPtr)
+                let bandsArray = rawPtr.assumingMemoryBound(to: krisha_band_t.self)
+                for i in 0..<10 {
+                    let gain = isEnabled ? bands[i] : 0.0
+                    bandsArray[i].frequency_hz = frequencies[i]
+                    bandsArray[i].gain_db = gain
+                    bandsArray[i].q_factor = qFactors[i]
+                    bandsArray[i].type = krisha_filter_type_t(UInt32(filterTypes[i].rawValue))
+                    bandsArray[i].enabled = isEnabled && (abs(gain) > 0.01)
+                }
             }
             
-            let applyResult = radioform_dsp_apply_preset(offlineEngine, &preset)
-            guard applyResult == RADIOFORM_OK else { return }
+            let applyResult = krisha_dsp_apply_preset(offlineEngine, &preset)
+            guard applyResult == KRISHA_OK else { return }
             
             var leftPoints: [CGPoint] = []
             var rightPoints: [CGPoint] = []
             
             for i in 0..<120 {
                 let freq = testFrequencies[i]
-                let leftDb = radioform_dsp_get_magnitude_at_frequency(offlineEngine, freq, true)
-                let rightDb = radioform_dsp_get_magnitude_at_frequency(offlineEngine, freq, false)
+                let leftDb = krisha_dsp_get_magnitude_at_frequency(offlineEngine, freq, true)
+                let rightDb = krisha_dsp_get_magnitude_at_frequency(offlineEngine, freq, false)
                 
                 // x is standardized in [0, 1] range representing log frequency
                 let x = CGFloat(i) / 119.0
@@ -142,25 +146,25 @@ struct LiveEQGraph: View {
                     curvePath(points: viewModel.leftPathPoints, size: geo.size)
                         .stroke(
                             LinearGradient(
-                                colors: [Color(.sRGB, red: 0.0, green: 0.9, blue: 0.9, alpha: 1.0), Color(.sRGB, red: 0.0, green: 0.5, blue: 0.9, alpha: 1.0)],
+                                colors: [Color(red: 0.0, green: 0.9, blue: 0.9), Color(red: 0.0, green: 0.5, blue: 0.9)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ),
                             lineWidth: 2
                         )
-                        .shadow(color: Color(.sRGB, red: 0.0, green: 0.8, blue: 0.8, alpha: 0.4), radius: 3)
+                        .shadow(color: Color(red: 0.0, green: 0.8, blue: 0.8).opacity(0.4), radius: 3)
                     
                     // Right Response Curve (Neon Magenta)
                     curvePath(points: viewModel.rightPathPoints, size: geo.size)
                         .stroke(
                             LinearGradient(
-                                colors: [Color(.sRGB, red: 1.0, green: 0.0, blue: 0.6, alpha: 1.0), Color(.sRGB, red: 0.8, green: 0.0, blue: 0.9, alpha: 1.0)],
+                                colors: [Color(red: 1.0, green: 0.0, blue: 0.6), Color(red: 0.8, green: 0.0, blue: 0.9)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ),
                             lineWidth: 2
                         )
-                        .shadow(color: Color(.sRGB, red: 0.9, green: 0.0, blue: 0.7, alpha: 0.4), radius: 3)
+                        .shadow(color: Color(red: 0.9, green: 0.0, blue: 0.7).opacity(0.4), radius: 3)
                     
                     // Hover Tooltip Marker & Text Overlay
                     if let location = hoverLocation {
@@ -295,7 +299,7 @@ struct LiveEQGraph: View {
             // Neon Cyan dot for Left channel
             if viewModel.leftPathPoints.indices.contains(index) {
                 Circle()
-                    .fill(Color(.sRGB, red: 0.0, green: 0.9, blue: 0.9, alpha: 1.0))
+                    .fill(Color(red: 0.0, green: 0.9, blue: 0.9))
                     .frame(width: 6, height: 6)
                     .position(x: location.x, y: viewModel.leftPathPoints[index].y * size.height)
             }
@@ -303,7 +307,7 @@ struct LiveEQGraph: View {
             // Neon Magenta dot for Right channel
             if viewModel.rightPathPoints.indices.contains(index) {
                 Circle()
-                    .fill(Color(.sRGB, red: 1.0, green: 0.0, blue: 0.6, alpha: 1.0))
+                    .fill(Color(red: 1.0, green: 0.0, blue: 0.6))
                     .frame(width: 6, height: 6)
                     .position(x: location.x, y: viewModel.rightPathPoints[index].y * size.height)
             }
@@ -315,17 +319,17 @@ struct LiveEQGraph: View {
                     .foregroundColor(.white)
                 
                 HStack(spacing: 6) {
-                    Circle().fill(Color(.sRGB, red: 0.0, green: 0.8, blue: 0.8, alpha: 1.0)).frame(width: 4, height: 4)
+                    Circle().fill(Color(red: 0.0, green: 0.8, blue: 0.8)).frame(width: 4, height: 4)
                     Text("L: \(String(format: "%.1f", leftDb)) dB")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(Color(.sRGB, red: 0.0, green: 0.85, blue: 0.85, alpha: 1.0))
+                        .foregroundColor(Color(red: 0.0, green: 0.85, blue: 0.85))
                 }
                 
                 HStack(spacing: 6) {
-                    Circle().fill(Color(.sRGB, red: 0.9, green: 0.0, blue: 0.6, alpha: 1.0)).frame(width: 4, height: 4)
+                    Circle().fill(Color(red: 0.9, green: 0.0, blue: 0.6)).frame(width: 4, height: 4)
                     Text("R: \(String(format: "%.1f", rightDb)) dB")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(Color(.sRGB, red: 0.95, green: 0.0, blue: 0.65, alpha: 1.0))
+                        .foregroundColor(Color(red: 0.95, green: 0.0, blue: 0.65))
                 }
             }
             .padding(6)

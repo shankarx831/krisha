@@ -1,2 +1,9 @@
-KRISHA (Modifications, Headless UI, & Spoke Architecture) Copyright (C) 2026 Shankar
-Original DSP Engine Copyright (C) Radioform / Original Authors
+KRISHA (Modifications, Headless UI, native Spokes, & Architecture) 
+Copyright (C) 2026 Shankar
+
+Based on the Radioform C++ DSP Engine
+Copyright (C) Radioform / Original Authors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 3.

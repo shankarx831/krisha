@@ -1,12 +1,12 @@
 #!/bin/bash
-# Code signing script for Radioform
+# Code signing script for Krisha
 # Signs all components with Developer ID certificate
 
 set -e  # Exit on error
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-APP_BUNDLE="$PROJECT_ROOT/dist/Radioform.app"
+APP_BUNDLE="$PROJECT_ROOT/dist/Krisha.app"
 
 # Colors for output
 RED='\033[0;31m'
@@ -108,7 +108,7 @@ else
     echo "Using identity: $SIGNING_IDENTITY"
 fi
 
-section "Code Signing Radioform"
+section "Code Signing Krisha"
 
 # Signing options
 SIGN_OPTS=(
@@ -119,25 +119,25 @@ SIGN_OPTS=(
     --verbose
 )
 
-# Step 1: Sign RadioformHost executable
-echo " Signing RadioformHost..."
+# Step 1: Sign KrishaHost executable
+echo " Signing KrishaHost..."
 if codesign "${SIGN_OPTS[@]}" \
-    --entitlements "$PROJECT_ROOT/packages/host/RadioformHost.entitlements" \
-    "$APP_BUNDLE/Contents/MacOS/RadioformHost"; then
-    success "RadioformHost signed"
+    --entitlements "$PROJECT_ROOT/packages/host/KrishaHost.entitlements" \
+    "$APP_BUNDLE/Contents/MacOS/KrishaHost"; then
+    success "KrishaHost signed"
 else
-    error "Failed to sign RadioformHost"
+    error "Failed to sign KrishaHost"
     exit 1
 fi
 
-# Step 2: Sign RadioformDriver.driver bundle (if present)
-if [ -d "$APP_BUNDLE/Contents/Resources/RadioformDriver.driver" ]; then
-    echo " Signing RadioformDriver.driver..."
+# Step 2: Sign KrishaDriver.driver bundle (if present)
+if [ -d "$APP_BUNDLE/Contents/Resources/KrishaDriver.driver" ]; then
+    echo " Signing KrishaDriver.driver..."
 
     # Sign the driver binary inside the bundle
-    if [ -f "$APP_BUNDLE/Contents/Resources/RadioformDriver.driver/Contents/MacOS/RadioformDriver" ]; then
+    if [ -f "$APP_BUNDLE/Contents/Resources/KrishaDriver.driver/Contents/MacOS/KrishaDriver" ]; then
         if codesign "${SIGN_OPTS[@]}" \
-            "$APP_BUNDLE/Contents/Resources/RadioformDriver.driver/Contents/MacOS/RadioformDriver"; then
+            "$APP_BUNDLE/Contents/Resources/KrishaDriver.driver/Contents/MacOS/KrishaDriver"; then
             success "Driver binary signed"
         else
             error "Failed to sign driver binary"
@@ -147,14 +147,14 @@ if [ -d "$APP_BUNDLE/Contents/Resources/RadioformDriver.driver" ]; then
 
     # Sign the driver bundle
     if codesign "${SIGN_OPTS[@]}" \
-        "$APP_BUNDLE/Contents/Resources/RadioformDriver.driver"; then
-        success "RadioformDriver.driver bundle signed"
+        "$APP_BUNDLE/Contents/Resources/KrishaDriver.driver"; then
+        success "KrishaDriver.driver bundle signed"
     else
         error "Failed to sign driver bundle"
         exit 1
     fi
 else
-    warn "RadioformDriver.driver not found in bundle (optional)"
+    warn "KrishaDriver.driver not found in bundle (optional)"
 fi
 
 # Step 3: Sign embedded frameworks (e.g. Sparkle)
@@ -203,23 +203,23 @@ else
     warn "No frameworks found in bundle"
 fi
 
-# Step 4: Sign RadioformApp main executable
-echo "Signing RadioformApp..."
+# Step 4: Sign KrishaApp main executable
+echo "Signing KrishaApp..."
 if codesign "${SIGN_OPTS[@]}" \
-    --entitlements "$PROJECT_ROOT/apps/mac/RadioformApp/RadioformApp.entitlements" \
-    "$APP_BUNDLE/Contents/MacOS/RadioformApp"; then
-    success "RadioformApp signed"
+    --entitlements "$PROJECT_ROOT/apps/mac/KrishaApp/KrishaApp.entitlements" \
+    "$APP_BUNDLE/Contents/MacOS/KrishaApp"; then
+    success "KrishaApp signed"
 else
-    error "Failed to sign RadioformApp"
+    error "Failed to sign KrishaApp"
     exit 1
 fi
 
 # Step 5: Sign the entire app bundle (outer signature)
-echo "Signing Radioform.app bundle..."
+echo "Signing Krisha.app bundle..."
 if codesign "${SIGN_OPTS[@]}" \
-    --entitlements "$PROJECT_ROOT/apps/mac/RadioformApp/RadioformApp.entitlements" \
+    --entitlements "$PROJECT_ROOT/apps/mac/KrishaApp/KrishaApp.entitlements" \
     "$APP_BUNDLE"; then
-    success "Radioform.app bundle signed"
+    success "Krisha.app bundle signed"
 else
     error "Failed to sign app bundle"
     exit 1
@@ -228,18 +228,18 @@ fi
 section "Verification"
 
 # Verify all signatures
-echo " Verifying RadioformHost..."
-codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE/Contents/MacOS/RadioformHost"
+echo " Verifying KrishaHost..."
+codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE/Contents/MacOS/KrishaHost"
 
-if [ -d "$APP_BUNDLE/Contents/Resources/RadioformDriver.driver" ]; then
-    echo " Verifying RadioformDriver.driver..."
-    codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE/Contents/Resources/RadioformDriver.driver"
+if [ -d "$APP_BUNDLE/Contents/Resources/KrishaDriver.driver" ]; then
+    echo " Verifying KrishaDriver.driver..."
+    codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE/Contents/Resources/KrishaDriver.driver"
 fi
 
-echo " Verifying RadioformApp..."
-codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE/Contents/MacOS/RadioformApp"
+echo " Verifying KrishaApp..."
+codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE/Contents/MacOS/KrishaApp"
 
-echo " Verifying Radioform.app bundle..."
+echo " Verifying Krisha.app bundle..."
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
 # Check Gatekeeper acceptance

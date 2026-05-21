@@ -1,3 +1,3 @@
 # apps/web/
 
-Web presence for Radioform.
+Web presence for Krisha.

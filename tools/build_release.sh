@@ -1,5 +1,5 @@
 #!/bin/bash
-# Master build script for Radioform release builds
+# Master build script for Krisha release builds
 # Builds all components as universal binaries (arm64 + x86_64)
 
 set -e  # Exit on error
@@ -7,7 +7,7 @@ set -e  # Exit on error
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-echo "Building Radioform Release (Universal Binary)"
+echo "Building Krisha Release (Universal Binary)"
 echo "==============================================="
 echo ""
 
@@ -63,12 +63,12 @@ echo "OK: HAL driver built (universal)"
 
 # 3. Build Audio Host (universal via build-twice + lipo)
 section "3/5 Building Audio Host (Swift universal)"
-build_swift_universal "$PROJECT_ROOT/packages/host" "RadioformHost"
+build_swift_universal "$PROJECT_ROOT/packages/host" "KrishaHost"
 echo "OK: Audio host built (universal)"
 
 # 4. Build Menu Bar App (universal via build-twice + lipo)
 section "4/5 Building Menu Bar App (Swift universal)"
-build_swift_universal "$PROJECT_ROOT/apps/mac/RadioformApp" "RadioformApp"
+build_swift_universal "$PROJECT_ROOT/apps/mac/KrishaApp" "KrishaApp"
 echo "OK: Menu bar app built (universal)"
 
 # 5. Create .app Bundle
@@ -81,14 +81,14 @@ echo "----------------------------------------"
 echo "  Build Complete! (Universal Binary)"
 echo "----------------------------------------"
 echo ""
-echo "App bundle: $PROJECT_ROOT/dist/Radioform.app"
+echo "App bundle: $PROJECT_ROOT/dist/Krisha.app"
 echo ""
 echo "Verify architectures:"
-echo "  lipo -archs dist/Radioform.app/Contents/MacOS/RadioformApp"
-echo "  lipo -archs dist/Radioform.app/Contents/MacOS/RadioformHost"
+echo "  lipo -archs dist/Krisha.app/Contents/MacOS/KrishaApp"
+echo "  lipo -archs dist/Krisha.app/Contents/MacOS/KrishaHost"
 echo ""
 echo "To test the app:"
-echo "  open dist/Radioform.app"
+echo "  open dist/Krisha.app"
 echo ""
 echo "To create a DMG:"
 echo "  tools/create_dmg.sh"

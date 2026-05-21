@@ -1,4 +1,4 @@
-package com.radioform.spoke.android
+package com.krisha.spoke.android
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
         
         // Load the Phase 2 JNI bridge containing the static C++ Core linking
         try {
-            System.loadLibrary("radioform_jni")
+            System.loadLibrary("krisha_jni")
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -147,6 +147,8 @@ fun KrishaScreen() {
             }
         }
 
+        val activity = androidx.compose.ui.platform.LocalContext.current as? androidx.activity.ComponentActivity
+
         // Bypass switch
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -158,6 +160,23 @@ fun KrishaScreen() {
                 checked = isBypass,
                 onCheckedChange = { isBypass = it }
             )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Reset & Stop Panic Button
+        Button(
+            onClick = {
+                preampLeft = 0.0f
+                preampRight = 0.0f
+                isBypass = true
+                activity?.finishAndRemoveTask()
+                kotlin.system.exitProcess(0)
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B30)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Reset & Stop KRISHA (Panic Button)", color = Color.White)
         }
     }
 }

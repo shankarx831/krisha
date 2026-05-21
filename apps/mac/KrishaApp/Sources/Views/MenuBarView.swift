@@ -1,7 +1,7 @@
 import SwiftUI
 
 // Cache font lookup once at launch
-private let radioformFont: Font = {
+private let krishaFont: Font = {
     let size: CGFloat = 22
     let possibleNames = [
         "SignPainterHouseScript",
@@ -31,7 +31,7 @@ struct MenuBarView: View {
                 // Header with toggle only (no title)
                 HStack {
                     Text("KRISHA")
-                        .font(radioformFont)
+                        .font(krishaFont)
                         
                     Spacer()
 

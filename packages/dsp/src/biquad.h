@@ -1,16 +1,20 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file biquad.h
  * @brief Self-contained biquad filter using RBJ cookbook formulas
  */
 
-#ifndef RADIOFORM_BIQUAD_H
-#define RADIOFORM_BIQUAD_H
+#ifndef KRISHA_BIQUAD_H
+#define KRISHA_BIQUAD_H
 
-#include "radioform_types.h"
+#include "krisha_types.h"
 #include <cmath>
 #include <cstring>
 
-namespace radioform {
+namespace krisha {
 
 static constexpr float PI = 3.14159265358979323846f;
 
@@ -67,7 +71,7 @@ public:
     /**
      * @brief Set coefficients from band configuration (instant, no smoothing)
      */
-    void setCoeffs(const radioform_band_t& band, float sample_rate) {
+    void setCoeffs(const krisha_band_t& band, float sample_rate) {
         BiquadCoeffs c = calculateCoeffs(band, sample_rate);
         if (isFinite(c)) {
             coeffs_ = c;
@@ -87,7 +91,7 @@ public:
      * @param sample_rate Sample rate in Hz
      * @param transition_samples Number of samples to interpolate over (~10ms)
      */
-    void setCoeffsSmooth(const radioform_band_t& band, float sample_rate, int transition_samples) {
+    void setCoeffsSmooth(const krisha_band_t& band, float sample_rate, int transition_samples) {
         BiquadCoeffs c = calculateCoeffs(band, sample_rate);
         if (!isFinite(c)) {
             setCoeffsFlat();
@@ -193,7 +197,7 @@ private:
      * high-frequency bandwidth cramping.
      * https://www.w3.org/TR/audio-eq-cookbook/
      */
-    BiquadCoeffs calculateCoeffs(const radioform_band_t& band, float sample_rate) {
+    BiquadCoeffs calculateCoeffs(const krisha_band_t& band, float sample_rate) {
         BiquadCoeffs c;
 
         const float freq = band.frequency_hz;
@@ -213,7 +217,7 @@ private:
         const float A = std::pow(10.0f, gain_db / 40.0f); // Sqrt of gain
 
         switch (band.type) {
-            case RADIOFORM_FILTER_PEAK: {
+            case KRISHA_FILTER_PEAK: {
                 // Parametric peaking EQ with enhanced bandwidth prewarping
                 const float a0 = 1.0f + alpha / A;
                 c.b0 = (1.0f + alpha * A) / a0;
@@ -224,7 +228,7 @@ private:
                 break;
             }
 
-            case RADIOFORM_FILTER_LOW_SHELF: {
+            case KRISHA_FILTER_LOW_SHELF: {
                 // Low shelf.
                 const float beta = std::sqrt(A) / Q;
                 const float a0 = (A + 1.0f) + (A - 1.0f) * cos_w0 + beta * sin_w0;
@@ -237,7 +241,7 @@ private:
                 break;
             }
 
-            case RADIOFORM_FILTER_HIGH_SHELF: {
+            case KRISHA_FILTER_HIGH_SHELF: {
                 // High shelf.
                 const float beta = std::sqrt(A) / Q;
                 const float a0 = (A + 1.0f) - (A - 1.0f) * cos_w0 + beta * sin_w0;
@@ -250,7 +254,7 @@ private:
                 break;
             }
 
-            case RADIOFORM_FILTER_LOW_PASS: {
+            case KRISHA_FILTER_LOW_PASS: {
                 // Low-pass filter
                 const float a0 = 1.0f + alpha;
                 c.b0 = ((1.0f - cos_w0) / 2.0f) / a0;
@@ -261,7 +265,7 @@ private:
                 break;
             }
 
-            case RADIOFORM_FILTER_HIGH_PASS: {
+            case KRISHA_FILTER_HIGH_PASS: {
                 // High-pass filter
                 const float a0 = 1.0f + alpha;
                 c.b0 = ((1.0f + cos_w0) / 2.0f) / a0;
@@ -272,7 +276,7 @@ private:
                 break;
             }
 
-            case RADIOFORM_FILTER_NOTCH: {
+            case KRISHA_FILTER_NOTCH: {
                 // Notch filter
                 const float a0 = 1.0f + alpha;
                 c.b0 = 1.0f / a0;
@@ -283,7 +287,7 @@ private:
                 break;
             }
 
-            case RADIOFORM_FILTER_BAND_PASS: {
+            case KRISHA_FILTER_BAND_PASS: {
                 // Band-pass filter
                 const float a0 = 1.0f + alpha;
                 c.b0 = alpha / a0;
@@ -315,6 +319,6 @@ private:
     BiquadState state_right_;
 };
 
-} // namespace radioform
+} // namespace krisha
 
-#endif // RADIOFORM_BIQUAD_H
+#endif // KRISHA_BIQUAD_H

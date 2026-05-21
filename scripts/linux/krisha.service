@@ -1,0 +1,13 @@
+[Unit]
+Description=KRISHA Parametric Equalizer PipeWire Virtual Sink Spoke
+After=pipewire.service
+Conflicts=pulseaudio.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/krisha-pw-sink
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

@@ -58,7 +58,7 @@ let package = Package(
             name: "KrishaApp",
             dependencies: [
                 .product(name: "Sparkle", package: "Sparkle"),
-                "CRadioformDSP"
+                "CKrishaDSP"
             ],
             path: "Sources",
             resources: [
@@ -69,13 +69,13 @@ let package = Package(
                 .linkedLibrary("c++"),
                 .unsafeFlags([
                     "-L../../../packages/dsp/build",
-                    "-lradioform_dsp"
+                    "-lkrisha_dsp"
                 ])
             ]
         ),
         .target(
-            name: "CRadioformDSP",
-            path: "../../../packages/host/Sources/CRadioformDSP",
+            name: "CKrishaDSP",
+            path: "CKrishaDSP",
             publicHeadersPath: "include"
         )
     ]

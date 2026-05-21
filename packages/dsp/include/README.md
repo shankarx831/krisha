@@ -1,11 +1,11 @@
 # packages/dsp/include/
 
-Public C API headers for the Radioform DSP library.
+Public C API headers for the Krisha DSP library.
 
 ## Files
 
-- `radioform_dsp.h` - Engine lifecycle, parameter control, audio processing
-- `radioform_types.h` - POD types, enums, structs
+- `krisha_dsp.h` - Engine lifecycle, parameter control, audio processing
+- `krisha_types.h` - POD types, enums, structs
 
 ## Design
 

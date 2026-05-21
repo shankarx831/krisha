@@ -1,6 +1,6 @@
 # apps/
 
-Application layer for Radioform across different platforms and deployment targets.
+Application layer for Krisha across different platforms and deployment targets.
 
 ## Contents
 

@@ -7,7 +7,7 @@ add_executable(wav_processor
 
 target_link_libraries(wav_processor
     PRIVATE
-        radioform_dsp
+        krisha_dsp
 )
 
 target_include_directories(wav_processor

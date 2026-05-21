@@ -1,4 +1,4 @@
-// Radioform HAL driver implementation.
+// Krisha HAL driver implementation.
 
 #include <aspl/Driver.hpp>
 #include <CoreAudio/AudioServerPlugIn.h>
@@ -28,17 +28,17 @@
 #include <mach/mach_time.h>
 
 // Logging
-static os_log_t rf_log = os_log_create("com.radioform.driver", "default");
+static os_log_t rf_log = os_log_create("com.krisha.driver", "default");
 
-#define RF_LOG_ERROR(fmt, ...) os_log_error(rf_log, "[Radioform ERROR] " fmt, ##__VA_ARGS__)
-#define RF_LOG_INFO(fmt, ...) os_log_info(rf_log, "[Radioform INFO] " fmt, ##__VA_ARGS__)
-#define RF_LOG_DEBUG(fmt, ...) os_log_debug(rf_log, "[Radioform DEBUG] " fmt, ##__VA_ARGS__)
+#define RF_LOG_ERROR(fmt, ...) os_log_error(rf_log, "[Krisha ERROR] " fmt, ##__VA_ARGS__)
+#define RF_LOG_INFO(fmt, ...) os_log_info(rf_log, "[Krisha INFO] " fmt, ##__VA_ARGS__)
+#define RF_LOG_DEBUG(fmt, ...) os_log_debug(rf_log, "[Krisha DEBUG] " fmt, ##__VA_ARGS__)
 
 // Fallback file logger for debugging when unified logs are unavailable.
 static void RF_DebugLog(const char* fmt, ...) {
     static std::mutex log_mutex;
     std::lock_guard<std::mutex> lock(log_mutex);
-    FILE* f = fopen("/tmp/radioform-driver-debug.log", "a");
+    FILE* f = fopen("/tmp/krisha-driver-debug.log", "a");
     if (!f) return;
     va_list args;
     va_start(args, fmt);
@@ -193,9 +193,9 @@ struct AudioStats {
 // never catch up, causing monotonic clock drift that Safari's Web Audio
 // drift-compensation interprets as stutter.
 // This override computes elapsed periods via integer division from an anchor time.
-class RadioformDevice : public aspl::Device {
+class KrishaDevice : public aspl::Device {
 public:
-    RadioformDevice(std::shared_ptr<aspl::Context> context,
+    KrishaDevice(std::shared_ptr<aspl::Context> context,
                     const aspl::DeviceParameters& params)
         : aspl::Device(context, params)
         , anchorTime_(0)
@@ -307,7 +307,7 @@ public:
         for (char& c : safe_uid) {
             if (c == ':' || c == '/' || c == ' ') c = '_';
         }
-        shm_file_path_ = "/tmp/radioform-" + safe_uid;
+        shm_file_path_ = "/tmp/krisha-" + safe_uid;
 
         RF_LOG_INFO("UniversalAudioHandler created: %s", device_uid_.c_str());
         RF_LOG_INFO("  Supports: 44.1-192kHz, 1-8ch, all formats");
@@ -853,10 +853,10 @@ private:
         RF_LOG_ERROR("");
         RF_LOG_ERROR("Troubleshooting:");
         RF_LOG_ERROR("  1. Is host application running?");
-        RF_LOG_ERROR("  2. Check: ls -la /tmp/radioform-*");
-        RF_LOG_ERROR("  3. Check: cat /tmp/radioform-devices.txt");
+        RF_LOG_ERROR("  2. Check: ls -la /tmp/krisha-*");
+        RF_LOG_ERROR("  3. Check: cat /tmp/krisha-devices.txt");
         RF_LOG_ERROR("  4. Try: sudo killall coreaudiod");
-        RF_LOG_ERROR("  5. Check logs: log show --predicate 'subsystem == \"com.radioform.driver\"'");
+        RF_LOG_ERROR("  5. Check logs: log show --predicate 'subsystem == \"com.krisha.driver\"'");
     }
 
     // Member variables
@@ -891,7 +891,7 @@ private:
 };
 
 // Global state
-struct RadioformGlobalState {
+struct KrishaGlobalState {
     std::shared_ptr<aspl::Context> context;
     std::shared_ptr<aspl::Plugin> plugin;
     std::shared_ptr<aspl::Driver> driver;
@@ -909,15 +909,15 @@ struct RadioformGlobalState {
     std::map<std::string, std::chrono::steady_clock::time_point> device_removal_times;
 };
 
-static RadioformGlobalState* g_state = nullptr;
+static KrishaGlobalState* g_state = nullptr;
 
 std::shared_ptr<aspl::Device> CreateProxyDevice(const std::string& name, const std::string& uid) {
     if (!g_state) return nullptr;
 
     aspl::DeviceParameters params;
-    params.Name = name + " (Radioform)";
-    params.DeviceUID = uid + "-radioform";
-    params.Manufacturer = "Radioform";
+    params.Name = name + " (Krisha)";
+    params.DeviceUID = uid + "-krisha";
+    params.Manufacturer = "Krisha";
     params.SampleRate = DEFAULT_SAMPLE_RATE;
     params.ChannelCount = DEFAULT_CHANNELS;
     params.EnableMixing = true;
@@ -925,7 +925,7 @@ std::shared_ptr<aspl::Device> CreateProxyDevice(const std::string& name, const s
     params.SafetyOffset = HAL_SAFETY_OFFSET_FRAMES;
     params.Latency = HAL_PRESENTATION_LATENCY_FRAMES;
 
-    auto device = std::make_shared<RadioformDevice>(g_state->context, params);
+    auto device = std::make_shared<KrishaDevice>(g_state->context, params);
     device->AddStreamWithControlsAsync(aspl::Direction::Output);
 
     auto handler = std::make_shared<UniversalAudioHandler>(uid);
@@ -946,7 +946,7 @@ void AddDevice(const std::string& name, const std::string& uid) {
         g_state->devices[uid] = device;
         // Preserve any stale heartbeat knowledge; only init if missing.
         if (g_state->host_hb_cache.find(uid) == g_state->host_hb_cache.end()) {
-            g_state->host_hb_cache[uid] = RadioformGlobalState::HostHeartbeatState{};
+            g_state->host_hb_cache[uid] = KrishaGlobalState::HostHeartbeatState{};
         }
     }
 }
@@ -979,7 +979,7 @@ bool IsDeviceInCooldown(const std::string& uid) {
 
 std::map<std::string, std::string> ParseControlFile() {
     std::map<std::string, std::string> devices;
-    std::ifstream file("/tmp/radioform-devices.txt");
+    std::ifstream file("/tmp/krisha-devices.txt");
     if (!file.is_open()) return devices;
 
     std::string line;
@@ -999,7 +999,7 @@ bool HostHeartbeatFresh(const std::string& uid) {
     for (char& c : safe_uid) {
         if (c == ':' || c == '/' || c == ' ') c = '_';
     }
-    std::string path = "/tmp/radioform-" + safe_uid;
+    std::string path = "/tmp/krisha-" + safe_uid;
 
     struct stat st;
     if (stat(path.c_str(), &st) != 0) {
@@ -1088,10 +1088,10 @@ void MonitorControlFile() {
     }
 }
 
-std::shared_ptr<aspl::Driver> CreateRadioformDriver() {
+std::shared_ptr<aspl::Driver> CreateKrishaDriver() {
 
 
-    g_state = new RadioformGlobalState();
+    g_state = new KrishaGlobalState();
     g_state->context = std::make_shared<aspl::Context>();
     g_state->plugin = std::make_shared<aspl::Plugin>(g_state->context);
 
@@ -1108,8 +1108,8 @@ std::shared_ptr<aspl::Driver> CreateRadioformDriver() {
 
 } // namespace
 
-extern "C" void* RadioformDriverPluginFactory(CFAllocatorRef allocator, CFUUIDRef typeUUID) {
+extern "C" void* KrishaDriverPluginFactory(CFAllocatorRef allocator, CFUUIDRef typeUUID) {
     if (!CFEqual(typeUUID, kAudioServerPlugInTypeUUID)) return nullptr;
-    static std::shared_ptr<aspl::Driver> driver = CreateRadioformDriver();
+    static std::shared_ptr<aspl::Driver> driver = CreateKrishaDriver();
     return driver->GetReference();
 }

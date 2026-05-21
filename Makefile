@@ -1,12 +1,12 @@
-# Radioform Development Makefile
-# Shortcuts for building, testing, and running Radioform
+# Krisha Development Makefile
+# Shortcuts for building, testing, and running Krisha
 
 .PHONY: help clean build run dev reset bundle install-deps test sign verify release test-release quick rebuild dmg full-release changelog update-version
 
 # Default target - show help
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "  Radioform Development Commands"
+	@echo "  Krisha Development Commands"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "  Development:"
@@ -41,15 +41,15 @@ help:
 # Start from scratch - full developer workflow with onboarding
 dev: reset build bundle
 	@echo ""
-	@echo "Starting Radioform with onboarding..."
+	@echo "Starting Krisha with onboarding..."
 	@echo ""
-	@open dist/Radioform.app
+	@open dist/Krisha.app
 
 # Run app normally without resetting onboarding
 run:
-	@echo "Starting Radioform..."
-	@if [ -d "dist/Radioform.app" ]; then \
-		open dist/Radioform.app; \
+	@echo "Starting Krisha..."
+	@if [ -d "dist/Krisha.app" ]; then \
+		open dist/Krisha.app; \
 	else \
 		echo "❌ App bundle not found. Run 'make bundle' first."; \
 		exit 1; \
@@ -77,18 +77,18 @@ clean:
 	@rm -rf packages/dsp/build
 	@rm -rf packages/driver/build
 	@rm -rf packages/host/.build
-	@rm -rf apps/mac/RadioformApp/.build
+	@rm -rf apps/mac/KrishaApp/.build
 	@rm -rf dist
 	@echo "✓ Clean complete"
 
 # Reset onboarding and uninstall driver (for testing onboarding flow)
 reset:
-	@echo "Resetting Radioform for fresh start..."
-	@pkill -f "RadioformApp|RadioformHost" 2>/dev/null || true
+	@echo "Resetting Krisha for fresh start..."
+	@pkill -f "KrishaApp|KrishaHost" 2>/dev/null || true
 	@./tools/uninstall_driver.sh || echo "No driver to uninstall (this is fine)"
-	@defaults delete com.radioform.menubar hasCompletedOnboarding 2>/dev/null || true
-	@defaults delete com.radioform.menubar onboardingVersion 2>/dev/null || true
-	@defaults delete com.radioform.menubar driverInstallDate 2>/dev/null || true
+	@defaults delete com.krisha.menubar hasCompletedOnboarding 2>/dev/null || true
+	@defaults delete com.krisha.menubar onboardingVersion 2>/dev/null || true
+	@defaults delete com.krisha.menubar driverInstallDate 2>/dev/null || true
 	@sleep 2
 	@echo "✓ Reset complete - next launch will show onboarding"
 
@@ -107,13 +107,13 @@ test:
 	cd build && \
 	cmake .. && \
 	cmake --build . && \
-	./radioform_dsp_tests
+	./tests/krisha_dsp_tests
 
 # Quick rebuild (for when you only changed Swift code)
 quick:
 	@echo "Quick rebuild (Swift only, universal)..."
-	@cd apps/mac/RadioformApp && swift build -c release --triple arm64-apple-macosx && swift build -c release --triple x86_64-apple-macosx && mkdir -p .build/universal/release && lipo -create -output .build/universal/release/RadioformApp .build/arm64-apple-macosx/release/RadioformApp .build/x86_64-apple-macosx/release/RadioformApp
-	@cd packages/host && swift build -c release --triple arm64-apple-macosx && swift build -c release --triple x86_64-apple-macosx && mkdir -p .build/universal/release && lipo -create -output .build/universal/release/RadioformHost .build/arm64-apple-macosx/release/RadioformHost .build/x86_64-apple-macosx/release/RadioformHost
+	@cd apps/mac/KrishaApp && swift build -c release --triple arm64-apple-macosx && swift build -c release --triple x86_64-apple-macosx && mkdir -p .build/universal/release && lipo -create -output .build/universal/release/KrishaApp .build/arm64-apple-macosx/release/KrishaApp .build/x86_64-apple-macosx/release/KrishaApp
+	@cd packages/host && swift build -c release --triple arm64-apple-macosx && swift build -c release --triple x86_64-apple-macosx && mkdir -p .build/universal/release && lipo -create -output .build/universal/release/KrishaHost .build/arm64-apple-macosx/release/KrishaHost .build/x86_64-apple-macosx/release/KrishaHost
 	@./tools/create_app_bundle.sh
 	@echo "✓ Quick rebuild complete (universal)"
 
@@ -123,7 +123,7 @@ rebuild: clean build bundle
 
 # Code signing targets
 sign:
-	@echo "Code signing Radioform.app..."
+	@echo "Code signing Krisha.app..."
 	@./tools/codesign.sh
 
 verify:
@@ -137,7 +137,7 @@ release: build bundle sign verify
 	@echo "     Release Build Complete!"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@echo "Signed app: dist/Radioform.app"
+	@echo "Signed app: dist/Krisha.app"
 	@echo ""
 	@echo "Next steps:"
 	@echo "  • Test: make test-release"
@@ -148,7 +148,7 @@ release: build bundle sign verify
 # Test the signed release build
 test-release:
 	@echo " Testing signed release build..."
-	@open dist/Radioform.app
+	@open dist/Krisha.app
 
 # Create DMG for distribution
 dmg:

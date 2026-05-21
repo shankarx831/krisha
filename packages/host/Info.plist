@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Radioform Audio Host</string>
+	<string>Krisha Audio Host</string>
 	<key>CFBundleExecutable</key>
-	<string>RadioformHost</string>
+	<string>KrishaHost</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.radioform.host</string>
+	<string>com.krisha.host</string>
 	<key>CFBundleName</key>
-	<string>RadioformHost</string>
+	<string>KrishaHost</string>
 	<key>CFBundleShortVersionString</key>
 	<string>2.1.2</string>
 	<key>CFBundleVersion</key>

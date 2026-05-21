@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-# Radioform Notarization Script
+# Krisha Notarization Script
 # Submits the signed app to Apple for notarization
 
-APP_PATH="dist/Radioform.app"
-ZIP_PATH="dist/Radioform.zip"
+APP_PATH="dist/Krisha.app"
+ZIP_PATH="dist/Krisha.zip"
 
 echo ""
-echo " Notarizing Radioform.app..."
+echo " Notarizing Krisha.app..."
 echo ""
 echo "----------------------------------------"
 echo "  Checking Prerequisites"

@@ -22,8 +22,10 @@ extension View {
 }
 
 #if DEBUG
-#Preview {
-    VintagePaperBackground()
-        .frame(width: 600, height: 500)
+struct VintagePaperBackground_Previews: PreviewProvider {
+    static var previews: some View {
+        VintagePaperBackground()
+            .frame(width: 600, height: 500)
+    }
 }
 #endif

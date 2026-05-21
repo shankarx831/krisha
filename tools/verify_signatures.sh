@@ -1,12 +1,12 @@
 #!/bin/bash
-# Signature verification script for Radioform
+# Signature verification script for Krisha
 # Validates all code signatures and entitlements
 
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-APP_BUNDLE="${1:-$PROJECT_ROOT/dist/Radioform.app}"
+APP_BUNDLE="${1:-$PROJECT_ROOT/dist/Krisha.app}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -29,11 +29,11 @@ section() {
 
 if [ ! -d "$APP_BUNDLE" ]; then
     error "App bundle not found: $APP_BUNDLE"
-    echo "Usage: $0 [path/to/Radioform.app]"
+    echo "Usage: $0 [path/to/Krisha.app]"
     exit 1
 fi
 
-section "Radioform Signature Verification"
+section "Krisha Signature Verification"
 echo "Bundle: $APP_BUNDLE"
 
 FAILED=0
@@ -93,9 +93,9 @@ verify_component() {
 }
 
 # Verify each component
-verify_component "$APP_BUNDLE/Contents/MacOS/RadioformHost" "RadioformHost"
-verify_component "$APP_BUNDLE/Contents/MacOS/RadioformApp" "RadioformApp"
-verify_component "$APP_BUNDLE/Contents/Resources/RadioformDriver.driver" "RadioformDriver.driver"
+verify_component "$APP_BUNDLE/Contents/MacOS/KrishaHost" "KrishaHost"
+verify_component "$APP_BUNDLE/Contents/MacOS/KrishaApp" "KrishaApp"
+verify_component "$APP_BUNDLE/Contents/Resources/KrishaDriver.driver" "KrishaDriver.driver"
 if [ -d "$APP_BUNDLE/Contents/Frameworks" ]; then
     while IFS= read -r framework; do
         verify_component "$framework" "$(basename "$framework")"
@@ -103,7 +103,7 @@ if [ -d "$APP_BUNDLE/Contents/Frameworks" ]; then
 else
     warn "No frameworks found in bundle"
 fi
-verify_component "$APP_BUNDLE" "Radioform.app (bundle)"
+verify_component "$APP_BUNDLE" "Krisha.app (bundle)"
 
 section "Gatekeeper Assessment"
 

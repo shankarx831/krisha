@@ -1,4 +1,4 @@
-package com.radioform.spoke.android
+package com.krisha.spoke.android
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -7,10 +7,10 @@ import java.net.URL
 /**
  * JNI Bridge class mapping to packages/spokes/android/jni_bridge.cpp.
  */
-object RadioformJNI {
+object KrishaJNI {
     init {
         try {
-            System.loadLibrary("radioform_jni")
+            System.loadLibrary("krisha_jni")
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -37,7 +37,7 @@ class AutoEqSearch {
             val rawText = URL(urlString).readText()
 
             if (rawText.isNotEmpty()) {
-                val flatArray = RadioformJNI.parseAutoEq(rawText)
+                val flatArray = KrishaJNI.parseAutoEq(rawText)
                 if (flatArray != null && flatArray.size >= 4) {
                     val preampGlobal = flatArray[0]
                     val preampLeft = flatArray[1]

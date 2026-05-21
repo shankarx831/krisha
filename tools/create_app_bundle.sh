@@ -1,5 +1,5 @@
 #!/bin/bash
-# Create proper .app bundle structure for Radioform
+# Create proper .app bundle structure for Krisha
 # Supports universal binaries (arm64 + x86_64)
 
 set -e  # Exit on error
@@ -7,7 +7,7 @@ set -e  # Exit on error
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 DIST_DIR="$PROJECT_ROOT/dist"
-APP_NAME="Radioform.app"
+APP_NAME="Krisha.app"
 APP_PATH="$DIST_DIR/$APP_NAME"
 
 # Helper: find a Swift build product, checking universal build path first,
@@ -57,7 +57,7 @@ find_swift_product() {
     echo ""
 }
 
-echo "Creating Radioform.app bundle structure..."
+echo "Creating Krisha.app bundle structure..."
 
 # Clean and create dist directory
 rm -rf "$DIST_DIR"
@@ -72,13 +72,13 @@ echo "  Created bundle structure"
 
 # Copy Info.plist
 echo "  Copying Info.plist..."
-cp "$PROJECT_ROOT/apps/mac/RadioformApp/Info.plist" "$APP_PATH/Contents/Info.plist"
+cp "$PROJECT_ROOT/apps/mac/KrishaApp/Info.plist" "$APP_PATH/Contents/Info.plist"
 echo "  Info.plist copied"
 
 # Copy app icon
 echo "  Copying app icon..."
-ICON_SOURCE="$PROJECT_ROOT/apps/mac/RadioformApp/Sources/Resources/MyIcon.icns"
-ICON_SIZES_DIR="$PROJECT_ROOT/apps/mac/RadioformApp/Sources/Resources/icons"
+ICON_SOURCE="$PROJECT_ROOT/apps/mac/KrishaApp/Sources/Resources/MyIcon.icns"
+ICON_SIZES_DIR="$PROJECT_ROOT/apps/mac/KrishaApp/Sources/Resources/icons"
 ICON_DEST="$APP_PATH/Contents/Resources/MyIcon.icns"
 if [ -d "$ICON_SIZES_DIR" ] && command -v iconutil >/dev/null 2>&1; then
     TMP_ICONSET="$(mktemp -d)/MyIcon.iconset"
@@ -103,54 +103,54 @@ else
     echo "  Warning: App icon not found at $ICON_SIZES_DIR or $ICON_SOURCE"
 fi
 
-# Copy main executable (RadioformApp)
-echo "  Copying RadioformApp executable..."
-APP_EXECUTABLE=$(find_swift_product "$PROJECT_ROOT/apps/mac/RadioformApp" "RadioformApp")
+# Copy main executable (KrishaApp)
+echo "  Copying KrishaApp executable..."
+APP_EXECUTABLE=$(find_swift_product "$PROJECT_ROOT/apps/mac/KrishaApp" "KrishaApp")
 
 if [ -z "$APP_EXECUTABLE" ]; then
-    echo "  Error: RadioformApp executable not found. Build it first:"
-    echo "   cd apps/mac/RadioformApp && swift build -c release --arch arm64 --arch x86_64"
+    echo "  Error: KrishaApp executable not found. Build it first:"
+    echo "   cd apps/mac/KrishaApp && swift build -c release --arch arm64 --arch x86_64"
     exit 1
 fi
 
-cp "$APP_EXECUTABLE" "$APP_PATH/Contents/MacOS/RadioformApp"
-chmod +x "$APP_PATH/Contents/MacOS/RadioformApp"
+cp "$APP_EXECUTABLE" "$APP_PATH/Contents/MacOS/KrishaApp"
+chmod +x "$APP_PATH/Contents/MacOS/KrishaApp"
 
 # Add rpath for Frameworks directory (needed for Sparkle)
-install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_PATH/Contents/MacOS/RadioformApp" 2>/dev/null || true
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_PATH/Contents/MacOS/KrishaApp" 2>/dev/null || true
 
-echo "  RadioformApp executable copied"
+echo "  KrishaApp executable copied"
 
-# Copy RadioformHost
-echo "  Copying RadioformHost..."
-HOST_EXECUTABLE=$(find_swift_product "$PROJECT_ROOT/packages/host" "RadioformHost")
+# Copy KrishaHost
+echo "  Copying KrishaHost..."
+HOST_EXECUTABLE=$(find_swift_product "$PROJECT_ROOT/packages/host" "KrishaHost")
 
 if [ -z "$HOST_EXECUTABLE" ]; then
-    echo "  Error: RadioformHost executable not found. Build it first:"
+    echo "  Error: KrishaHost executable not found. Build it first:"
     echo "   cd packages/host && swift build -c release --arch arm64 --arch x86_64"
     exit 1
 fi
 
-cp "$HOST_EXECUTABLE" "$APP_PATH/Contents/MacOS/RadioformHost"
-chmod +x "$APP_PATH/Contents/MacOS/RadioformHost"
-echo "  RadioformHost copied"
+cp "$HOST_EXECUTABLE" "$APP_PATH/Contents/MacOS/KrishaHost"
+chmod +x "$APP_PATH/Contents/MacOS/KrishaHost"
+echo "  KrishaHost copied"
 
-# Copy RadioformDriver.driver
-echo "  Copying RadioformDriver.driver..."
-DRIVER_BUNDLE="$PROJECT_ROOT/packages/driver/build/RadioformDriver.driver"
+# Copy KrishaDriver.driver
+echo "  Copying KrishaDriver.driver..."
+DRIVER_BUNDLE="$PROJECT_ROOT/packages/driver/build/KrishaDriver.driver"
 
 if [ ! -d "$DRIVER_BUNDLE" ]; then
-    echo "  RadioformDriver.driver not found - will need to be installed separately"
+    echo "  KrishaDriver.driver not found - will need to be installed separately"
     echo "   Note: Driver installation will be handled during onboarding"
     echo "   For development, build with: cd packages/driver && ./install.sh"
 else
-    cp -R "$DRIVER_BUNDLE" "$APP_PATH/Contents/Resources/RadioformDriver.driver"
-    echo "  RadioformDriver.driver copied"
+    cp -R "$DRIVER_BUNDLE" "$APP_PATH/Contents/Resources/KrishaDriver.driver"
+    echo "  KrishaDriver.driver copied"
 fi
 
 # Copy presets
 echo "  Copying presets..."
-PRESETS_DIR="$PROJECT_ROOT/apps/mac/RadioformApp/Sources/Resources/Presets"
+PRESETS_DIR="$PROJECT_ROOT/apps/mac/KrishaApp/Sources/Resources/Presets"
 
 if [ -d "$PRESETS_DIR" ]; then
     cp -R "$PRESETS_DIR"/* "$APP_PATH/Contents/Resources/Presets/"
@@ -161,7 +161,7 @@ fi
 
 # Copy other app resources (images, fonts, etc.)
 echo "  Copying app resources..."
-RESOURCES_DIR="$PROJECT_ROOT/apps/mac/RadioformApp/Sources/Resources"
+RESOURCES_DIR="$PROJECT_ROOT/apps/mac/KrishaApp/Sources/Resources"
 if [ -d "$RESOURCES_DIR" ]; then
     # Copy everything except Presets (already handled above)
     rsync -av --exclude "Presets" "$RESOURCES_DIR"/ "$APP_PATH/Contents/Resources/" >/dev/null
@@ -174,14 +174,14 @@ fi
 echo "  Copying Sparkle.framework..."
 mkdir -p "$APP_PATH/Contents/Frameworks"
 
-SPARKLE_FRAMEWORK=$(find_swift_product "$PROJECT_ROOT/apps/mac/RadioformApp" "Sparkle.framework")
+SPARKLE_FRAMEWORK=$(find_swift_product "$PROJECT_ROOT/apps/mac/KrishaApp" "Sparkle.framework")
 
 if [ -d "$SPARKLE_FRAMEWORK" ]; then
     cp -R "$SPARKLE_FRAMEWORK" "$APP_PATH/Contents/Frameworks/"
     echo "  Sparkle.framework copied"
 else
     echo "  Sparkle.framework not found"
-    echo "   Searched in: $PROJECT_ROOT/apps/mac/RadioformApp/.build/"
+    echo "   Searched in: $PROJECT_ROOT/apps/mac/KrishaApp/.build/"
 fi
 
 # Create PkgInfo file
@@ -189,22 +189,22 @@ echo "APPL????" > "$APP_PATH/Contents/PkgInfo"
 
 # Verify architectures if lipo is available
 echo ""
-echo "  Radioform.app bundle created successfully!"
+echo "  Krisha.app bundle created successfully!"
 echo "   Location: $APP_PATH"
 echo ""
 if command -v lipo >/dev/null 2>&1; then
     echo "Architectures:"
-    echo "  RadioformApp: $(lipo -archs "$APP_PATH/Contents/MacOS/RadioformApp" 2>/dev/null || echo 'unknown')"
-    echo "  RadioformHost: $(lipo -archs "$APP_PATH/Contents/MacOS/RadioformHost" 2>/dev/null || echo 'unknown')"
-    if [ -f "$APP_PATH/Contents/Resources/RadioformDriver.driver/Contents/MacOS/RadioformDriver" ]; then
-        echo "  RadioformDriver: $(lipo -archs "$APP_PATH/Contents/Resources/RadioformDriver.driver/Contents/MacOS/RadioformDriver" 2>/dev/null || echo 'unknown')"
+    echo "  KrishaApp: $(lipo -archs "$APP_PATH/Contents/MacOS/KrishaApp" 2>/dev/null || echo 'unknown')"
+    echo "  KrishaHost: $(lipo -archs "$APP_PATH/Contents/MacOS/KrishaHost" 2>/dev/null || echo 'unknown')"
+    if [ -f "$APP_PATH/Contents/Resources/KrishaDriver.driver/Contents/MacOS/KrishaDriver" ]; then
+        echo "  KrishaDriver: $(lipo -archs "$APP_PATH/Contents/Resources/KrishaDriver.driver/Contents/MacOS/KrishaDriver" 2>/dev/null || echo 'unknown')"
     fi
     echo ""
 fi
 echo "Bundle contents:"
-echo "  - RadioformApp (main executable)"
-echo "  - RadioformHost (audio engine)"
-echo "  - RadioformDriver.driver (HAL driver)"
+echo "  - KrishaApp (main executable)"
+echo "  - KrishaHost (audio engine)"
+echo "  - KrishaDriver.driver (HAL driver)"
 echo "  - Presets (EQ configurations)"
 echo ""
 echo "To test the bundle:"

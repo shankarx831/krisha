@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace 'com.radioform.spoke.android'
+    namespace 'com.krisha.spoke.android'
     compileSdk 34
 
     defaultConfig {

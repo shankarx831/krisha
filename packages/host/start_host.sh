@@ -1,13 +1,13 @@
 #!/bin/bash
-# Radioform Host Engine Launcher
+# Krisha Host Engine Launcher
 
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-HOST_BINARY="$SCRIPT_DIR/.build/release/RadioformHost"
-DEBUG_BINARY="$SCRIPT_DIR/.build/debug/RadioformHost"
+HOST_BINARY="$SCRIPT_DIR/.build/release/KrishaHost"
+DEBUG_BINARY="$SCRIPT_DIR/.build/debug/KrishaHost"
 
-echo "Radioform Host Engine Launcher"
+echo "Krisha Host Engine Launcher"
 echo "=============================="
 echo ""
 

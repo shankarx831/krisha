@@ -70,7 +70,7 @@ jobs:
           echo "✓ Version update complete"
 
           # Show what changed for verification
-          git diff apps/mac/RadioformApp/Info.plist packages/driver/Info.plist packages/host/Info.plist
+          git diff apps/mac/KrishaApp/Info.plist packages/driver/Info.plist packages/host/Info.plist
 
       # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       #  Install Apple Certificate
@@ -129,30 +129,30 @@ jobs:
           swift build --configuration release --package-path packages/host \
             --triple x86_64-apple-macosx
           mkdir -p packages/host/.build/universal/release
-          lipo -create -output packages/host/.build/universal/release/RadioformHost \
-            packages/host/.build/arm64-apple-macosx/release/RadioformHost \
-            packages/host/.build/x86_64-apple-macosx/release/RadioformHost
+          lipo -create -output packages/host/.build/universal/release/KrishaHost \
+            packages/host/.build/arm64-apple-macosx/release/KrishaHost \
+            packages/host/.build/x86_64-apple-macosx/release/KrishaHost
           echo "✓ Host engine built (universal)"
 
       - name: Build Menu Bar App (universal)
         run: |
-          swift build --configuration release --package-path apps/mac/RadioformApp \
+          swift build --configuration release --package-path apps/mac/KrishaApp \
             --triple arm64-apple-macosx
-          swift build --configuration release --package-path apps/mac/RadioformApp \
+          swift build --configuration release --package-path apps/mac/KrishaApp \
             --triple x86_64-apple-macosx
-          mkdir -p apps/mac/RadioformApp/.build/universal/release
-          lipo -create -output apps/mac/RadioformApp/.build/universal/release/RadioformApp \
-            apps/mac/RadioformApp/.build/arm64-apple-macosx/release/RadioformApp \
-            apps/mac/RadioformApp/.build/x86_64-apple-macosx/release/RadioformApp
+          mkdir -p apps/mac/KrishaApp/.build/universal/release
+          lipo -create -output apps/mac/KrishaApp/.build/universal/release/KrishaApp \
+            apps/mac/KrishaApp/.build/arm64-apple-macosx/release/KrishaApp \
+            apps/mac/KrishaApp/.build/x86_64-apple-macosx/release/KrishaApp
           echo "✓ Menu bar app built (universal)"
 
       - name: Verify universal architectures
         run: |
           echo "Verifying universal binary architectures..."
-          lipo -archs packages/dsp/build/libradioform_dsp.a
-          lipo -archs packages/driver/build/RadioformDriver.driver/Contents/MacOS/RadioformDriver
-          lipo -archs packages/host/.build/universal/release/RadioformHost
-          lipo -archs apps/mac/RadioformApp/.build/universal/release/RadioformApp
+          lipo -archs packages/dsp/build/libkrisha_dsp.a
+          lipo -archs packages/driver/build/KrishaDriver.driver/Contents/MacOS/KrishaDriver
+          lipo -archs packages/host/.build/universal/release/KrishaHost
+          lipo -archs apps/mac/KrishaApp/.build/universal/release/KrishaApp
           echo "✓ All binaries are universal"
 
       # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -186,12 +186,12 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           # Create zip for notarization
-          ditto -c -k --keepParent dist/Radioform.app dist/Radioform.zip
+          ditto -c -k --keepParent dist/Krisha.app dist/Krisha.zip
 
           RESULT_JSON=$(mktemp)
 
           # Submit for notarization and capture the result
-          if ! xcrun notarytool submit dist/Radioform.zip \
+          if ! xcrun notarytool submit dist/Krisha.zip \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
@@ -227,10 +227,10 @@ jobs:
           fi
 
           # Staple the ticket
-          xcrun stapler staple dist/Radioform.app
+          xcrun stapler staple dist/Krisha.app
 
           # Clean up
-          rm dist/Radioform.zip "$RESULT_JSON"
+          rm dist/Krisha.zip "$RESULT_JSON"
 
           echo "✓ App notarized and stapled"
 
@@ -244,7 +244,7 @@ jobs:
 
       - name: Create DMG
         run: |
-          DMG_NAME="Radioform.dmg"
+          DMG_NAME="Krisha.dmg"
 
           # Use the create_dmg.sh script for proper layout (app + Applications symlink)
           ./tools/create_dmg.sh
@@ -356,7 +356,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          name: Radioform v${{ steps.version.outputs.version }}
+          name: Krisha v${{ steps.version.outputs.version }}
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha') }}
           body_path: release_notes.md

@@ -1,41 +1,45 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file test_engine.cpp
  * @brief Tests for full DSP engine
  */
 
 #include "test_utils.h"
-#include "radioform_dsp.h"
+#include "krisha_dsp.h"
 
 using namespace dsp_test;
 
 TEST(engine_create_destroy) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
 
     PASS();
 }
 
 TEST(engine_invalid_sample_rate) {
     // Too low
-    auto* engine1 = radioform_dsp_create(1000);
+    auto* engine1 = krisha_dsp_create(1000);
     ASSERT(engine1 == nullptr);
 
     // Too high
-    auto* engine2 = radioform_dsp_create(500000);
+    auto* engine2 = krisha_dsp_create(500000);
     ASSERT(engine2 == nullptr);
 
     PASS();
 }
 
 TEST(engine_bypass_is_bit_perfect) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
     // Enable bypass
-    radioform_dsp_set_bypass(engine, true);
-    ASSERT_EQ(radioform_dsp_get_bypass(engine), true);
+    krisha_dsp_set_bypass(engine, true);
+    ASSERT_EQ(krisha_dsp_get_bypass(engine), true);
 
     // Generate test signal
     auto input_left = generate_sine(1000, 1000.0f, 48000.0f);
@@ -44,7 +48,7 @@ TEST(engine_bypass_is_bit_perfect) {
     std::vector<float> output_right(input_right.size());
 
     // Process in bypass mode (planar)
-    radioform_dsp_process_planar(
+    krisha_dsp_process_planar(
         engine,
         input_left.data(), input_right.data(),
         output_left.data(), output_right.data(),
@@ -55,15 +59,15 @@ TEST(engine_bypass_is_bit_perfect) {
     ASSERT(signals_identical(input_left, output_left));
     ASSERT(signals_identical(input_right, output_right));
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_bypass_interleaved_is_bit_perfect) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
-    radioform_dsp_set_bypass(engine, true);
+    krisha_dsp_set_bypass(engine, true);
 
     // Generate interleaved test signal
     std::vector<float> input(2000); // 1000 frames stereo
@@ -76,7 +80,7 @@ TEST(engine_bypass_interleaved_is_bit_perfect) {
     std::vector<float> output(input.size());
 
     // Process
-    radioform_dsp_process_interleaved(
+    krisha_dsp_process_interleaved(
         engine,
         input.data(),
         output.data(),
@@ -86,35 +90,35 @@ TEST(engine_bypass_interleaved_is_bit_perfect) {
     // Output should be identical
     ASSERT(signals_identical(input, output));
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_apply_flat_preset) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
-    radioform_preset_t preset;
-    radioform_dsp_preset_init_flat(&preset);
+    krisha_preset_t preset;
+    krisha_dsp_preset_init_flat(&preset);
 
-    auto result = radioform_dsp_apply_preset(engine, &preset);
-    ASSERT_EQ(result, RADIOFORM_OK);
+    auto result = krisha_dsp_apply_preset(engine, &preset);
+    ASSERT_EQ(result, KRISHA_OK);
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_process_with_flat_preset) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
     // Apply flat preset
-    radioform_preset_t preset;
-    radioform_dsp_preset_init_flat(&preset);
-    radioform_dsp_apply_preset(engine, &preset);
+    krisha_preset_t preset;
+    krisha_dsp_preset_init_flat(&preset);
+    krisha_dsp_apply_preset(engine, &preset);
 
     // Disable bypass
-    radioform_dsp_set_bypass(engine, false);
+    krisha_dsp_set_bypass(engine, false);
 
     // Generate test signal
     auto input_left = generate_sine(4800, 1000.0f, 48000.0f);
@@ -123,7 +127,7 @@ TEST(engine_process_with_flat_preset) {
     std::vector<float> output_right(input_right.size());
 
     // Process
-    radioform_dsp_process_planar(
+    krisha_dsp_process_planar(
         engine,
         input_left.data(), input_right.data(),
         output_left.data(), output_right.data(),
@@ -137,27 +141,27 @@ TEST(engine_process_with_flat_preset) {
 
     ASSERT_NEAR(output_rms, input_rms, 0.1f);
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_peak_filter_boosts_signal) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
     // Create preset with +6dB peak at 1kHz
-    radioform_preset_t preset;
-    radioform_dsp_preset_init_flat(&preset);
+    krisha_preset_t preset;
+    krisha_dsp_preset_init_flat(&preset);
 
     preset.num_bands = 1;
     preset.bands[0].enabled = true;
     preset.bands[0].frequency_hz = 1000.0f;
     preset.bands[0].gain_db = 6.0f;
     preset.bands[0].q_factor = 2.0f;
-    preset.bands[0].type = RADIOFORM_FILTER_PEAK;
+    preset.bands[0].type = KRISHA_FILTER_PEAK;
 
-    radioform_dsp_apply_preset(engine, &preset);
-    radioform_dsp_set_bypass(engine, false);
+    krisha_dsp_apply_preset(engine, &preset);
+    krisha_dsp_set_bypass(engine, false);
 
     // Generate 1kHz test signal
     auto input_left = generate_sine(4800, 1000.0f, 48000.0f);
@@ -166,7 +170,7 @@ TEST(engine_peak_filter_boosts_signal) {
     std::vector<float> output_right(input_right.size());
 
     // Process
-    radioform_dsp_process_planar(
+    krisha_dsp_process_planar(
         engine,
         input_left.data(), input_right.data(),
         output_left.data(), output_right.data(),
@@ -179,24 +183,24 @@ TEST(engine_peak_filter_boosts_signal) {
     // Output should be louder (boosted)
     ASSERT(output_rms > input_rms * 1.5f); // At least +3.5dB
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_limiter_prevents_clipping) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
     // Create preset with significant boost
-    radioform_preset_t preset;
-    radioform_dsp_preset_init_flat(&preset);
+    krisha_preset_t preset;
+    krisha_dsp_preset_init_flat(&preset);
 
     preset.preamp_db = 12.0f; // +12dB preamp (will clip without limiter)
     preset.limiter_enabled = true;
     preset.limiter_threshold_db = -0.1f;
 
-    radioform_dsp_apply_preset(engine, &preset);
-    radioform_dsp_set_bypass(engine, false);
+    krisha_dsp_apply_preset(engine, &preset);
+    krisha_dsp_set_bypass(engine, false);
 
     // Generate loud test signal
     auto input_left = generate_sine(4800, 1000.0f, 48000.0f);
@@ -205,7 +209,7 @@ TEST(engine_limiter_prevents_clipping) {
     std::vector<float> output_right(input_right.size());
 
     // Process
-    radioform_dsp_process_planar(
+    krisha_dsp_process_planar(
         engine,
         input_left.data(), input_right.data(),
         output_left.data(), output_right.data(),
@@ -216,30 +220,30 @@ TEST(engine_limiter_prevents_clipping) {
     float peak = measure_peak(output_left);
     ASSERT(peak <= 1.0f); // Should not clip
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_update_band_gain_realtime) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
     // Create preset with one band
-    radioform_preset_t preset;
-    radioform_dsp_preset_init_flat(&preset);
+    krisha_preset_t preset;
+    krisha_dsp_preset_init_flat(&preset);
 
     preset.num_bands = 1;
     preset.bands[0].enabled = true;
     preset.bands[0].frequency_hz = 1000.0f;
     preset.bands[0].gain_db = 0.0f; // Start at 0dB
     preset.bands[0].q_factor = 1.0f;
-    preset.bands[0].type = RADIOFORM_FILTER_PEAK;
+    preset.bands[0].type = KRISHA_FILTER_PEAK;
 
-    radioform_dsp_apply_preset(engine, &preset);
-    radioform_dsp_set_bypass(engine, false);
+    krisha_dsp_apply_preset(engine, &preset);
+    krisha_dsp_set_bypass(engine, false);
 
     // Update gain in realtime
-    radioform_dsp_update_band_gain(engine, 0, 6.0f); // Change to +6dB
+    krisha_dsp_update_band_gain(engine, 0, 6.0f); // Change to +6dB
 
     // Generate test signal
     auto input_left = generate_sine(4800, 1000.0f, 48000.0f);
@@ -248,7 +252,7 @@ TEST(engine_update_band_gain_realtime) {
     std::vector<float> output_right(input_right.size());
 
     // Process
-    radioform_dsp_process_planar(
+    krisha_dsp_process_planar(
         engine,
         input_left.data(), input_right.data(),
         output_left.data(), output_right.data(),
@@ -261,16 +265,16 @@ TEST(engine_update_band_gain_realtime) {
 
     ASSERT(output_rms > input_rms * 1.3f);
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_statistics_tracking) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
-    radioform_stats_t stats;
-    radioform_dsp_get_stats(engine, &stats);
+    krisha_stats_t stats;
+    krisha_dsp_get_stats(engine, &stats);
 
     // Initial stats
     ASSERT_EQ(stats.frames_processed, 0);
@@ -283,7 +287,7 @@ TEST(engine_statistics_tracking) {
     std::vector<float> output_left(input_left.size());
     std::vector<float> output_right(input_right.size());
 
-    radioform_dsp_process_planar(
+    krisha_dsp_process_planar(
         engine,
         input_left.data(), input_right.data(),
         output_left.data(), output_right.data(),
@@ -291,29 +295,29 @@ TEST(engine_statistics_tracking) {
     );
 
     // Check stats updated
-    radioform_dsp_get_stats(engine, &stats);
+    krisha_dsp_get_stats(engine, &stats);
     ASSERT_EQ(stats.frames_processed, 1000);
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_reset_clears_state) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
     // Apply preset with filter
-    radioform_preset_t preset;
-    radioform_dsp_preset_init_flat(&preset);
+    krisha_preset_t preset;
+    krisha_dsp_preset_init_flat(&preset);
     preset.num_bands = 1;
     preset.bands[0].enabled = true;
     preset.bands[0].frequency_hz = 1000.0f;
     preset.bands[0].gain_db = 6.0f;
     preset.bands[0].q_factor = 2.0f;
-    preset.bands[0].type = RADIOFORM_FILTER_PEAK;
+    preset.bands[0].type = KRISHA_FILTER_PEAK;
 
-    radioform_dsp_apply_preset(engine, &preset);
-    radioform_dsp_set_bypass(engine, false);
+    krisha_dsp_apply_preset(engine, &preset);
+    krisha_dsp_set_bypass(engine, false);
 
     // Process some audio to build up filter state
     auto signal_left = generate_sine(1000, 1000.0f, 48000.0f);
@@ -321,7 +325,7 @@ TEST(engine_reset_clears_state) {
     std::vector<float> output_left(signal_left.size());
     std::vector<float> output_right(signal_right.size());
 
-    radioform_dsp_process_planar(
+    krisha_dsp_process_planar(
         engine,
         signal_left.data(), signal_right.data(),
         output_left.data(), output_right.data(),
@@ -329,28 +333,28 @@ TEST(engine_reset_clears_state) {
     );
 
     // Call reset to clear stats and history
-    radioform_dsp_reset(engine);
+    krisha_dsp_reset(engine);
 
     // Stats should be cleared
-    radioform_stats_t stats;
-    radioform_dsp_get_stats(engine, &stats);
+    krisha_stats_t stats;
+    krisha_dsp_get_stats(engine, &stats);
     ASSERT_EQ(stats.frames_processed, 0);
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_independent_lr_preamp) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
-    radioform_preset_t preset;
-    radioform_dsp_preset_init_flat(&preset);
+    krisha_preset_t preset;
+    krisha_dsp_preset_init_flat(&preset);
     preset.preamp_left_db = 6.0f;   // +6dB Left (~2.0x gain)
     preset.preamp_right_db = -6.0f; // -6dB Right (~0.5x gain)
     
-    radioform_dsp_apply_preset(engine, &preset);
-    radioform_dsp_set_bypass(engine, false);
+    krisha_dsp_apply_preset(engine, &preset);
+    krisha_dsp_set_bypass(engine, false);
 
     // Generate input signal
     auto input_left = generate_sine(5000, 1000.0f, 48000.0f);
@@ -359,7 +363,7 @@ TEST(engine_independent_lr_preamp) {
     std::vector<float> output_right(input_right.size());
 
     // Process
-    radioform_dsp_process_planar(
+    krisha_dsp_process_planar(
         engine,
         input_left.data(), input_right.data(),
         output_left.data(), output_right.data(),
@@ -380,11 +384,11 @@ TEST(engine_independent_lr_preamp) {
     ASSERT(out_r_rms < in_rms * 0.6f);
 
     // Realtime update testing
-    radioform_dsp_update_preamp_left(engine, -12.0f);
-    radioform_dsp_update_preamp_right(engine, 12.0f);
+    krisha_dsp_update_preamp_left(engine, -12.0f);
+    krisha_dsp_update_preamp_right(engine, 12.0f);
 
     // Process another block to let smoothers catch up
-    radioform_dsp_process_planar(
+    krisha_dsp_process_planar(
         engine,
         input_left.data(), input_right.data(),
         output_left.data(), output_right.data(),
@@ -402,28 +406,28 @@ TEST(engine_independent_lr_preamp) {
     ASSERT(out_l_rms < in_rms * 0.4f);
     ASSERT(out_r_rms > in_rms * 1.8f);
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_mathematical_bypass) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
     // Preset with 5 bands all set to 0.0dB gain
-    radioform_preset_t preset;
-    radioform_dsp_preset_init_flat(&preset);
+    krisha_preset_t preset;
+    krisha_dsp_preset_init_flat(&preset);
     preset.num_bands = 5;
     for (int i = 0; i < 5; i++) {
         preset.bands[i].enabled = true;
-        preset.bands[i].type = RADIOFORM_FILTER_PEAK;
+        preset.bands[i].type = KRISHA_FILTER_PEAK;
         preset.bands[i].gain_db = 0.0f; // Bypassed
         preset.bands[i].frequency_hz = 1000.0f * (i + 1);
         preset.bands[i].q_factor = 1.0f;
     }
 
-    radioform_dsp_apply_preset(engine, &preset);
-    radioform_dsp_set_bypass(engine, false);
+    krisha_dsp_apply_preset(engine, &preset);
+    krisha_dsp_set_bypass(engine, false);
 
     // Generate signal
     auto input = generate_sine(1000, 1000.0f, 48000.0f);
@@ -431,7 +435,7 @@ TEST(engine_mathematical_bypass) {
     std::vector<float> output_right(input.size());
 
     // Process
-    radioform_dsp_process_planar(
+    krisha_dsp_process_planar(
         engine,
         input.data(), input.data(),
         output_left.data(), output_right.data(),
@@ -444,29 +448,29 @@ TEST(engine_mathematical_bypass) {
     // Output should be transparent because all bands are mathematically bypassed
     ASSERT_NEAR(out_l_rms, in_rms, 1e-3f);
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }
 
 TEST(engine_magnitude_response) {
-    auto* engine = radioform_dsp_create(48000);
+    auto* engine = krisha_dsp_create(48000);
     ASSERT(engine != nullptr);
 
     // Create a +6dB boost preset at 1kHz
-    radioform_preset_t preset;
-    radioform_dsp_preset_init_flat(&preset);
+    krisha_preset_t preset;
+    krisha_dsp_preset_init_flat(&preset);
     preset.num_bands = 1;
     preset.bands[0].enabled = true;
     preset.bands[0].frequency_hz = 1000.0f;
     preset.bands[0].gain_db = 6.0f;
     preset.bands[0].q_factor = 1.0f;
-    preset.bands[0].type = RADIOFORM_FILTER_PEAK;
+    preset.bands[0].type = KRISHA_FILTER_PEAK;
 
-    radioform_dsp_apply_preset(engine, &preset);
+    krisha_dsp_apply_preset(engine, &preset);
 
     // Query magnitude response
-    float mag_at_1k = radioform_dsp_get_magnitude_at_frequency(engine, 1000.0f, true);
-    float mag_at_10k = radioform_dsp_get_magnitude_at_frequency(engine, 10000.0f, true);
+    float mag_at_1k = krisha_dsp_get_magnitude_at_frequency(engine, 1000.0f, true);
+    float mag_at_10k = krisha_dsp_get_magnitude_at_frequency(engine, 10000.0f, true);
 
     // 1kHz should be boosted by approx 6dB
     ASSERT_NEAR(mag_at_1k, 6.0f, 0.5f);
@@ -474,6 +478,6 @@ TEST(engine_magnitude_response) {
     // 10kHz should be near 0dB (outside the filter bandwidth)
     ASSERT_NEAR(mag_at_10k, 0.0f, 0.5f);
 
-    radioform_dsp_destroy(engine);
+    krisha_dsp_destroy(engine);
     PASS();
 }

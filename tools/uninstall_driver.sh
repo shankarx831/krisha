@@ -1,9 +1,9 @@
 #!/bin/bash
-# Uninstall Radioform driver (for testing)
+# Uninstall Krisha driver (for testing)
 
-echo "  Uninstalling Radioform driver..."
+echo "  Uninstalling Krisha driver..."
 
-osascript -e 'do shell script "rm -rf /Library/Audio/Plug-Ins/HAL/RadioformDriver.driver && killall coreaudiod" with administrator privileges'
+osascript -e 'do shell script "rm -rf /Library/Audio/Plug-Ins/HAL/KrishaDriver.driver && killall coreaudiod" with administrator privileges'
 
 if [ $? -eq 0 ]; then
     echo "OK: Driver uninstalled successfully"

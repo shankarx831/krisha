@@ -1,5 +1,5 @@
 import Foundation
-import CRadioformDSP
+import CKrishaDSP
 
 enum PresetError: Error {
     case invalidPreset
@@ -69,7 +69,7 @@ class PresetManager: ObservableObject {
 
         userPresetsURL =
             appSupport
-            .appendingPathComponent("Radioform")
+            .appendingPathComponent("Krisha")
             .appendingPathComponent("Presets")
 
         // Create directory if needed
@@ -125,7 +125,7 @@ class PresetManager: ObservableObject {
             if let executablePath = Bundle.main.executablePath {
                 let executableDir = (executablePath as NSString).deletingLastPathComponent
 
-                // For .build/debug/RadioformApp -> Sources/Resources/Presets
+                // For .build/debug/KrishaApp -> Sources/Resources/Presets
                 let debugPath = (executableDir as NSString).appendingPathComponent(
                     "../../Sources/Resources/Presets")
                 let normalizedDebugPath = (debugPath as NSString).standardizingPath
@@ -142,11 +142,11 @@ class PresetManager: ObservableObject {
             let cwd = FileManager.default.currentDirectoryPath
             let possiblePaths = [
                 "\(cwd)/Sources/Resources/Presets",
-                "\(cwd)/apps/mac/RadioformApp/Sources/Resources/Presets",
+                "\(cwd)/apps/mac/KrishaApp/Sources/Resources/Presets",
                 // Add home directory fallback for when launched from various locations
-                NSString(string: "~/radioform/apps/mac/RadioformApp/Sources/Resources/Presets")
+                NSString(string: "~/krisha/apps/mac/KrishaApp/Sources/Resources/Presets")
                     .expandingTildeInPath,
-                NSString(string: "~/radioform/apps/mac/RadioformApp/Sources/Resources/Presets")
+                NSString(string: "~/krisha/apps/mac/KrishaApp/Sources/Resources/Presets")
                     .expandingTildeInPath,
             ]
             for path in possiblePaths {
@@ -686,29 +686,33 @@ class PresetManager: ObservableObject {
 
     /// Parse a standard AutoEq ParametricEQ.txt stream in-memory using frozen C++ core parser
     func parseAutoEqText(_ text: String) -> EQPreset? {
-        var cPreset = radioform_preset_t()
-        radioform_dsp_preset_init_flat(&cPreset)
+        var cPreset = krisha_preset_t()
+        krisha_dsp_preset_init_flat(&cPreset)
 
         let result = text.withCString { cStr in
-            radioform_preset_parse_autoeq(cStr, &cPreset)
+            krisha_preset_parse_autoeq(cStr, &cPreset)
         }
 
-        guard result == RADIOFORM_OK else {
+        guard result == KRISHA_OK else {
             print("[PresetManager] C++ AutoEq parser failed with code: \(result.rawValue)")
             return nil
         }
 
         var bands: [EQBand] = []
-        for i in 0..<Int(cPreset.num_bands) {
-            let band = cPreset.bands[i]
-            let filterType = FilterType(rawValue: Int(band.type.rawValue)) ?? .peak
-            bands.append(EQBand(
-                frequencyHz: band.frequency_hz,
-                gainDb: band.gain_db,
-                qFactor: band.q_factor,
-                filterType: filterType,
-                enabled: band.enabled
-            ))
+        withUnsafePointer(to: cPreset.bands) { bandsPtr in
+            let rawPtr = UnsafeRawPointer(bandsPtr)
+            let bandsArray = rawPtr.assumingMemoryBound(to: krisha_band_t.self)
+            for i in 0..<Int(cPreset.num_bands) {
+                let band = bandsArray[i]
+                let filterType = FilterType(rawValue: Int(band.type.rawValue)) ?? .peak
+                bands.append(EQBand(
+                    frequencyHz: band.frequency_hz,
+                    gainDb: band.gain_db,
+                    qFactor: band.q_factor,
+                    filterType: filterType,
+                    enabled: band.enabled
+                ))
+            }
         }
 
         let name = withUnsafePointer(to: cPreset.name) { ptr in
@@ -730,15 +734,15 @@ class PresetManager: ObservableObject {
 
     /// Compute magnitude response for Left or Right channel over a custom list of frequencies
     func getMagnitudeResponse(frequencies: [Float], leftChannel: Bool) -> [Float] {
-        guard let offlineEngine = radioform_dsp_create(48000) else {
+        guard let offlineEngine = krisha_dsp_create(48000) else {
             return Array(repeating: 0.0, count: frequencies.count)
         }
         defer {
-            radioform_dsp_destroy(offlineEngine)
+            krisha_dsp_destroy(offlineEngine)
         }
 
-        var preset = radioform_preset_t()
-        radioform_dsp_preset_init_flat(&preset)
+        var preset = krisha_preset_t()
+        krisha_dsp_preset_init_flat(&preset)
 
         preset.num_bands = 10
         preset.preamp_db = currentPreampDb
@@ -747,22 +751,26 @@ class PresetManager: ObservableObject {
         preset.limiter_enabled = currentLimiterEnabled
         preset.limiter_threshold_db = currentLimiterThresholdDb
 
-        for i in 0..<10 {
-            let gain = isEnabled ? currentBands[i] : 0.0
-            preset.bands[i].frequency_hz = currentFrequencies[i]
-            preset.bands[i].gain_db = gain
-            preset.bands[i].q_factor = currentQFactors[i]
-            preset.bands[i].type = radioform_filter_type_t(UInt32(currentFilterTypes[i].rawValue))
-            preset.bands[i].enabled = isEnabled && (abs(gain) > 0.01)
+        withUnsafeMutablePointer(to: &preset.bands) { bandsPtr in
+            let rawPtr = UnsafeMutableRawPointer(bandsPtr)
+            let bands = rawPtr.assumingMemoryBound(to: krisha_band_t.self)
+            for i in 0..<10 {
+                let gain = isEnabled ? currentBands[i] : 0.0
+                bands[i].frequency_hz = currentFrequencies[i]
+                bands[i].gain_db = gain
+                bands[i].q_factor = currentQFactors[i]
+                bands[i].type = krisha_filter_type_t(UInt32(currentFilterTypes[i].rawValue))
+                bands[i].enabled = isEnabled && (abs(gain) > 0.01)
+            }
         }
 
-        let applyResult = radioform_dsp_apply_preset(offlineEngine, &preset)
-        guard applyResult == RADIOFORM_OK else {
+        let applyResult = krisha_dsp_apply_preset(offlineEngine, &preset)
+        guard applyResult == KRISHA_OK else {
             return Array(repeating: 0.0, count: frequencies.count)
         }
 
         return frequencies.map { freq in
-            radioform_dsp_get_magnitude_at_frequency(offlineEngine, freq, leftChannel)
+            krisha_dsp_get_magnitude_at_frequency(offlineEngine, freq, leftChannel)
         }
     }
 }

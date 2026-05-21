@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(RadioformDriver VERSION 2.1.2 LANGUAGES CXX)
+project(KrishaDriver VERSION 2.1.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,21 +26,21 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fsanitize=address")
 # libASPL
 add_subdirectory(vendor/libASPL)
 
-# Radioform Driver sources
+# Krisha Driver sources
 set(DRIVER_SOURCES
     src/Plugin.cpp
 )
 
 # Create the driver bundle
-add_library(RadioformDriver MODULE ${DRIVER_SOURCES})
+add_library(KrishaDriver MODULE ${DRIVER_SOURCES})
 
-target_include_directories(RadioformDriver
+target_include_directories(KrishaDriver
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/libASPL/include
 )
 
-target_link_libraries(RadioformDriver
+target_link_libraries(KrishaDriver
     PRIVATE
         libASPL
         "-framework CoreAudio"
@@ -49,20 +49,20 @@ target_link_libraries(RadioformDriver
 )
 
 # Bundle properties
-set_target_properties(RadioformDriver PROPERTIES
+set_target_properties(KrishaDriver PROPERTIES
     BUNDLE TRUE
     BUNDLE_EXTENSION "driver"
     MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist
-    OUTPUT_NAME "RadioformDriver"
+    OUTPUT_NAME "KrishaDriver"
 )
 
 # Install to /Library/Audio/Plug-Ins/HAL/
 # This requires sudo - use install script instead
-# install(TARGETS RadioformDriver
+# install(TARGETS KrishaDriver
 #     BUNDLE DESTINATION "/Library/Audio/Plug-Ins/HAL"
 # )
 
-message(STATUS "Radioform HAL Driver configured")
+message(STATUS "Krisha HAL Driver configured")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Multi-format: YES (int16/24/32, float32/64)")
 message(STATUS "  Multi-rate: YES (44.1-192 kHz)")

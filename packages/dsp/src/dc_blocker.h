@@ -1,3 +1,7 @@
+// Copyright (C) Radioform / Original Authors
+// Modified by Shankar (2026) for the KRISHA Architecture. Renamed namespaces and variables.
+// Licensed under the GNU GPLv3.
+
 /**
  * @file dc_blocker.h
  * @brief DC offset removal filter
@@ -6,13 +10,13 @@
  * Uses a very simple one-pole high-pass filter at ~5Hz.
  */
 
-#ifndef RADIOFORM_DC_BLOCKER_H
-#define RADIOFORM_DC_BLOCKER_H
+#ifndef KRISHA_DC_BLOCKER_H
+#define KRISHA_DC_BLOCKER_H
 
 #include <cstdint>
 #include <cmath>
 
-namespace radioform {
+namespace krisha {
 
 static constexpr float DC_BLOCKER_PI = 3.14159265358979323846f;
 
@@ -130,6 +134,6 @@ private:
     DCBlocker right_;
 };
 
-} // namespace radioform
+} // namespace krisha
 
-#endif // RADIOFORM_DC_BLOCKER_H
+#endif // KRISHA_DC_BLOCKER_H

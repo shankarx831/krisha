@@ -1,4 +1,4 @@
-# Radioform DSP Bridge
+# Krisha DSP Bridge
 
 This directory contains the Objective-C++ bridge that wraps the C DSP engine for easy consumption from Swift.
 
@@ -7,21 +7,21 @@ This directory contains the Objective-C++ bridge that wraps the C DSP engine for
 ```
 Swift App
     ↓
-RadioformDSPEngine (ObjC++)  ← This bridge layer
+KrishaDSPEngine (ObjC++)  ← This bridge layer
     ↓
-radioform_dsp.h (C API)
+krisha_dsp.h (C API)
     ↓
 C++ DSP Engine
 ```
 
 ## Files
 
-- **RadioformDSPEngine.h** - Public Objective-C header
+- **KrishaDSPEngine.h** - Public Objective-C header
   - Swift-friendly API with Foundation types
   - NSError-based error handling
   - Object-oriented preset and band management
 
-- **RadioformDSPEngine.mm** - Objective-C++ implementation
+- **KrishaDSPEngine.mm** - Objective-C++ implementation
   - Wraps the C engine lifecycle
   - Converts between ObjC and C types
   - Memory management with ARC
@@ -30,11 +30,11 @@ C++ DSP Engine
 
 ```swift
 // Create engine
-let engine = try RadioformDSPEngine(sampleRate: 48000)
+let engine = try KrishaDSPEngine(sampleRate: 48000)
 
 // Create a preset
-let preset = RadioformPreset.flatPreset()
-let band = RadioformBand(frequency: 1000, gain: 6.0, qFactor: 2.0, filterType: .peak)
+let preset = KrishaPreset.flatPreset()
+let band = KrishaBand(frequency: 1000, gain: 6.0, qFactor: 2.0, filterType: .peak)
 preset.bands = [band]
 
 // Apply preset
@@ -64,7 +64,7 @@ The bridge is built as part of the main DSP library. Include both the DSP librar
 
 ```objc
 // YourProject-Bridging-Header.h
-#import "RadioformDSPEngine.h"
+#import "KrishaDSPEngine.h"
 ```
 
 ## Thread Safety
@@ -85,4 +85,4 @@ The bridge is built as part of the main DSP library. Include both the DSP librar
 ## Testing
 
 Bridge behavior is exercised indirectly through the C API implementation in this package.
-For Objective-C++/Swift integration tests, add host-app tests that call `RadioformDSPEngine` directly.
+For Objective-C++/Swift integration tests, add host-app tests that call `KrishaDSPEngine` directly.

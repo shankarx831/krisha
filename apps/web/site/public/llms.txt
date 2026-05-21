@@ -1,8 +1,8 @@
-# Radioform
+# Krisha
 
-> Radioform is a free, open-source native macOS equalizer that lives in your menu bar and shapes your sound system-wide.
+> Krisha is a free, open-source native macOS equalizer that lives in your menu bar and shapes your sound system-wide.
 
-Radioform is a system-wide audio equalizer for macOS. It creates a virtual audio device that sits between your apps and your speakers, processing all system audio through a high-quality DSP engine in real-time with zero added latency and sub-1% CPU usage.
+Krisha is a system-wide audio equalizer for macOS. It creates a virtual audio device that sits between your apps and your speakers, processing all system audio through a high-quality DSP engine in real-time with zero added latency and sub-1% CPU usage.
 
 ## Key Facts
 
@@ -28,14 +28,14 @@ Radioform is a system-wide audio equalizer for macOS. It creates a virtual audio
 
 ## Links
 
-- Homepage: https://radioform.app
-- About / How It Works: https://radioform.app/about
-- Download (DMG): https://github.com/Torteous44/radioform/releases/latest/download/Radioform.dmg
-- GitHub Repository: https://github.com/Torteous44/radioform
+- Homepage: https://krisha.app
+- About / How It Works: https://krisha.app/about
+- Download (DMG): https://github.com/Torteous44/krisha/releases/latest/download/Krisha.dmg
+- GitHub Repository: https://github.com/Torteous44/krisha
 
 ## Comparison Context
 
-Radioform is comparable to products like SoundSource, eqMac, and Boom 3D, but is fully free and open-source. Unlike Electron-based alternatives, it is a native Swift/SwiftUI application with a C++ audio engine, resulting in minimal resource usage and zero latency.
+Krisha is comparable to products like SoundSource, eqMac, and Boom 3D, but is fully free and open-source. Unlike Electron-based alternatives, it is a native Swift/SwiftUI application with a C++ audio engine, resulting in minimal resource usage and zero latency.
 
 ## Creator
 

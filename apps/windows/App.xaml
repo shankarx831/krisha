@@ -1,5 +1,5 @@
 <Application
-    x:Class="RadioformSpoke.Windows.App"
+    x:Class="KrishaSpoke.Windows.App"
     xmlns="http://schemas.microsoft.com/winfx/2000/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2000/xaml"
     ShutdownMode="OnExplicitShutdown">

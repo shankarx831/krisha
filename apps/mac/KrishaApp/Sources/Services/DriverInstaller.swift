@@ -53,7 +53,7 @@ class DriverInstaller: ObservableObject {
     @Published var state: DriverInstallState = .notStarted
     @Published var progress: Double = 0.0
 
-    private let driverName = "RadioformDriver.driver"
+    private let driverName = "KrishaDriver.driver"
     private let driverDestination = "/Library/Audio/Plug-Ins/HAL"
 
     /// Install the driver with progress updates
@@ -117,7 +117,7 @@ class DriverInstaller: ObservableObject {
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             if let output = String(data: data, encoding: .utf8) {
-                return output.contains("Radioform")
+                return output.contains("Krisha")
             }
         } catch {
             print("Failed to check driver status: \(error)")
@@ -143,7 +143,7 @@ class DriverInstaller: ObservableObject {
         }
 
         // For production: driver should be in Resources
-        if let resourcePath = Bundle.main.path(forResource: "RadioformDriver", ofType: "driver") {
+        if let resourcePath = Bundle.main.path(forResource: "KrishaDriver", ofType: "driver") {
             return resourcePath
         }
 

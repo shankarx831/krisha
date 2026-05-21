@@ -3,13 +3,13 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
-namespace RadioformSpoke.Windows
+namespace KrishaSpoke.Windows
 {
     /// <summary>
-    /// Struct layouts matching C++ radioform_types.h for zero-copy memory interoperability.
+    /// Struct layouts matching C++ krisha_types.h for zero-copy memory interoperability.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    public struct RadioformBand
+    public struct KrishaBand
     {
         public float FrequencyHz;
         public float GainDb;
@@ -20,10 +20,10 @@ namespace RadioformSpoke.Windows
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-    public struct RadioformPreset
+    public struct KrishaPreset
     {
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 10)]
-        public RadioformBand[] Bands;
+        public KrishaBand[] Bands;
         public uint NumBands;
         public float PreampDb;
         public float PreampLeftDb;
@@ -37,13 +37,13 @@ namespace RadioformSpoke.Windows
 
     public class AutoEqSearch
     {
-        private const string DllName = "radioform_apo";
+        private const string DllName = "krisha_apo";
         private readonly HttpClient _httpClient;
 
-        [DllImport(DllName, EntryPoint = "radioform_preset_parse_autoeq", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int RadioformPresetParseAutoeq(
+        [DllImport(DllName, EntryPoint = "krisha_preset_parse_autoeq", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int KrishaPresetParseAutoeq(
             [MarshalAs(UnmanagedType.LPStr)] string text, 
-            ref RadioformPreset preset
+            ref KrishaPreset preset
         );
 
         public AutoEqSearch()
@@ -56,7 +56,7 @@ namespace RadioformSpoke.Windows
         /// Asynchronously fetches the ParametricEQ.txt for the specified headphone model
         /// and parses it using our native C++ core parser.
         /// </summary>
-        public async Task<RadioformPreset?> DownloadAndParsePresetAsync(string headphonePathName)
+        public async Task<KrishaPreset?> DownloadAndParsePresetAsync(string headphonePathName)
         {
             try
             {
@@ -67,13 +67,13 @@ namespace RadioformSpoke.Windows
                 if (string.IsNullOrWhiteSpace(content)) return null;
 
                 // Allocate a preset on the managed stack and pass reference to native C++ parser
-                RadioformPreset preset = new RadioformPreset
+                KrishaPreset preset = new KrishaPreset
                 {
-                    Bands = new RadioformBand[10]
+                    Bands = new KrishaBand[10]
                 };
 
-                int result = RadioformPresetParseAutoeq(content, ref preset);
-                if (result == 0) // RADIOFORM_OK
+                int result = KrishaPresetParseAutoeq(content, ref preset);
+                if (result == 0) // KRISHA_OK
                 {
                     return preset;
                 }
