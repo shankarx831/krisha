@@ -24,7 +24,7 @@ extern "C" {
 /**
  * @brief Maximum number of EQ bands supported
  */
-#define KRISHA_MAX_BANDS 10
+#define KRISHA_MAX_BANDS 10U
 
 /**
  * @brief Filter types for EQ bands

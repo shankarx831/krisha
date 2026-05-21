@@ -24,9 +24,11 @@ target_include_directories(krisha_dsp_tests PRIVATE
 )
 
 # Compiler flags for tests
-target_compile_options(krisha_dsp_tests PRIVATE
-    -Wall -Wextra -Wpedantic
-)
+if(MSVC)
+    target_compile_options(krisha_dsp_tests PRIVATE /W4)
+else()
+    target_compile_options(krisha_dsp_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
 
 # Add test to CTest
 add_test(NAME krisha_dsp_tests COMMAND krisha_dsp_tests)

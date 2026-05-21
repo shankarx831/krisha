@@ -125,7 +125,7 @@ static NSError * _Nullable KrishaErrorFromCError(krisha_error_t cError) {
     const float frequencies[] = {32.0f, 64.0f, 125.0f, 250.0f, 500.0f,
                                   1000.0f, 2000.0f, 4000.0f, 8000.0f, 16000.0f};
 
-    for (int i = 0; i < KRISHA_MAX_BANDS; i++) {
+    for (uint32_t i = 0; i < KRISHA_MAX_BANDS; i++) {
         KrishaBand *band = [[KrishaBand alloc] init];
         band.frequencyHz = frequencies[i];
         band.gainDb = 0.0f;

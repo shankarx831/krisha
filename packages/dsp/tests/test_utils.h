@@ -15,6 +15,22 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <type_traits>
+
+template <typename T, typename U>
+inline bool safe_compare_eq(const T& a, const U& b) {
+    if constexpr (std::is_integral_v<T> && std::is_integral_v<U>) {
+        if constexpr (std::is_signed_v<T> == std::is_signed_v<U>) {
+            return a == b;
+        } else if constexpr (std::is_signed_v<T>) {
+            return a >= 0 && static_cast<std::make_unsigned_t<T>>(a) == b;
+        } else {
+            return b >= 0 && a == static_cast<std::make_unsigned_t<U>>(b);
+        }
+    } else {
+        return a == b;
+    }
+}
 
 // ============================================================================
 // Simple Test Framework
@@ -70,7 +86,7 @@ static std::vector<std::pair<std::string, std::function<void()>>>& get_test_regi
     do { \
         auto _a = (a); \
         auto _b = (b); \
-        if (_a != _b) { \
+        if (!safe_compare_eq(_a, _b)) { \
             std::cerr << "❌ FAIL: " << __FILE__ << ":" << __LINE__ << ": " \
                       << #a << " (" << _a << ") != " << #b << " (" << _b << ")" \
                       << std::endl; \
