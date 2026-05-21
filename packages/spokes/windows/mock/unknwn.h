@@ -22,6 +22,14 @@ typedef int32_t HRESULT;
 #define STDMETHODIMP HRESULT
 #define STDMETHODIMP_(type) type
 
+#ifndef STDAPI
+#ifdef __cplusplus
+#define STDAPI extern "C" HRESULT
+#else
+#define STDAPI HRESULT
+#endif
+#endif
+
 typedef struct {
     uint32_t Data1;
     uint16_t Data2;

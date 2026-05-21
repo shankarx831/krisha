@@ -196,7 +196,7 @@ public:
 };
 
 // COM class factory entry point
-extern "C" __attribute__((visibility("default"))) HRESULT CreateKrishaAPOInstance(void** ppvObject) {
+STDAPI CreateKrishaAPOInstance(void** ppvObject) {
     if (!ppvObject) return E_POINTER;
     KrishaAPO* pAPO = new (std::nothrow) KrishaAPO();
     if (!pAPO) return E_FAIL;
