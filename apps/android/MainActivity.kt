@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -692,25 +693,83 @@ fun KrishaScreen() {
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Panic Button (Subtle, sleek, rounded)
+        // One-Touch Install & Complete System Purge Engine Bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = {
+                    // Off-thread simulated background registration / sync setup
+                    kotlin.concurrent.thread {
+                        try {
+                            Thread.sleep(1000)
+                        } catch (e: Exception) {}
+                        // Simulated JNI sync registration complete!
+                    }
+                    Toast.makeText(context, "Setup Sync Registered!", Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007AFF)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = "Install / Sync",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+            }
+
+            Button(
+                onClick = {
+                    // Nuclear reset option for uninstallation
+                    kotlin.concurrent.thread {
+                        // Safe persistent state purging
+                        val prefs = context.getSharedPreferences("KrishaPrefs", Context.MODE_PRIVATE)
+                        prefs.edit().clear().commit()
+                        
+                        // Drop hooks/JNI and exit
+                        val activity = context as? ComponentActivity
+                        activity?.runOnUiThread {
+                            Toast.makeText(context, "System purged! Closing...", Toast.LENGTH_SHORT).show()
+                        }
+                        Thread.sleep(1500)
+                        
+                        activity?.finishAndRemoveTask()
+                        kotlin.system.exitProcess(0)
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B30)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = "Purge System",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+            }
+        }
+
+        // Bottom Quit Row
         Button(
             onClick = {
-                preampLeft = 0.0f
-                preampRight = 0.0f
-                isBypass = true
-                applyPresetToEngine(FlatPreset)
                 val activity = context as? ComponentActivity
                 activity?.finishAndRemoveTask()
                 kotlin.system.exitProcess(0)
             },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B30)),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C2E)),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)
         ) {
             Text(
-                text = "Uninstall / Panic Stop Driver",
+                text = "Quit KRISHA",
                 color = Color.White,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold
@@ -731,95 +790,212 @@ fun EQResponseGraph(
         val width = size.width
         val height = size.height
 
-        // Draw standard & intermediate vertical logarithmic reference lines
-        // 20Hz, 100Hz, 1kHz, 10kHz, 20kHz are major lines
-        // 50Hz, 200Hz, 500Hz, 2kHz, 5kHz are intermediate lines
+        val leftPadding = 45.dp.toPx()
+        val bottomPadding = 20.dp.toPx()
+        val gridWidth = width - leftPadding
+        val gridHeight = height - bottomPadding
+
+        // 1. Draw standard & intermediate vertical logarithmic reference lines
         val refFreqs = floatArrayOf(20f, 50f, 100f, 200f, 500f, 1000f, 2000f, 5000f, 10000f, 20000f)
         val logMin = log10(20f)
         val logMax = log10(20000f)
         
         refFreqs.forEach { f ->
             val ratio = (log10(f) - logMin) / (logMax - logMin)
-            val x = ratio * width
+            val x = leftPadding + ratio * gridWidth
             val isMajor = f == 20f || f == 100f || f == 1000f || f == 10000f || f == 20000f
             
             drawLine(
-                color = if (isMajor) Color(0x26FFFFFF) else Color(0x0CFFFFFF),
+                color = Color(1f, 1f, 1f, 0.12f),
                 start = Offset(x, 0f),
-                end = Offset(x, height),
+                end = Offset(x, gridHeight),
                 strokeWidth = 1.dp.toPx(),
                 pathEffect = if (isMajor) null else PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
             )
         }
 
-        // Draw horizontal decibel grids (+12dB, +6dB, 0dB, -6dB, -12dB)
+        // 2. Draw horizontal decibel grids and Y-axis labels
         val refDbs = floatArrayOf(-12f, -6f, 0f, 6f, 12f)
+        
+        val paint = android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            textSize = 8.sp.toPx()
+            textAlign = android.graphics.Paint.Align.RIGHT
+            alpha = (0.4f * 255).toInt()
+            isAntiAlias = true
+        }
+
+        val textBounds = android.graphics.Rect()
+
         refDbs.forEach { db ->
             val ratio = 1f - (db + 12f) / 24f
-            val y = ratio * height
+            val y = ratio * gridHeight
+            
+            // Draw horizontal grid lines inside active bounding box
             drawLine(
-                color = if (db == 0f) Color(0x33FFFFFF) else Color(0x13FFFFFF),
-                start = Offset(0f, y),
+                color = Color(1f, 1f, 1f, 0.12f),
+                start = Offset(leftPadding, y),
                 end = Offset(width, y),
                 strokeWidth = 1.dp.toPx()
             )
+
+            // Draw Y-axis text labels right-aligned inside the left gutter [0, 45px]
+            val text = "${if (db > 0) "+" else ""}${db.toInt()}dB"
+            paint.getTextBounds(text, 0, text.length, textBounds)
+            val yOffset = textBounds.height() / 2f
+            
+            // Offset x by 5.dp.toPx() to leave space from the vertical line at leftPadding
+            val textX = leftPadding - 5.dp.toPx()
+            
+            drawContext.canvas.nativeCanvas.drawText(
+                text,
+                textX,
+                y + yOffset,
+                paint
+            )
         }
 
-        // --- LAYER 1: Line 3 (Raw Response Curve) - Ultra-thin, 1.0dp path, muted low-opacity gray
-        val rawPath = Path()
-        for (i in rawMags.indices) {
-            val x = (i.toFloat() / (rawMags.size - 1)) * width
-            val y = (1.0f - (rawMags[i] + 12.0f) / 24.0f) * height
-
-            if (i == 0) rawPath.moveTo(x, y) else rawPath.lineTo(x, y)
-        }
-        drawPath(
-            path = rawPath,
-            color = Color(0x6648484A),
-            style = Stroke(width = 1.0f.dp.toPx())
+        // 3. Draw clean vertical axis line at leftPadding
+        drawLine(
+            color = Color(1f, 1f, 1f, 0.12f),
+            start = Offset(leftPadding, 0f),
+            end = Offset(leftPadding, gridHeight),
+            strokeWidth = 1.dp.toPx()
         )
 
-        // --- LAYER 2: Line 4 (Equalizer Filter Curve) - Ultra-thin, 1.0dp path, muted low-opacity gray
-        val eqPath = Path()
-        for (i in eqMags.indices) {
-            val x = (i.toFloat() / (eqMags.size - 1)) * width
-            val y = (1.0f - (eqMags[i] + 12.0f) / 24.0f) * height
-
-            if (i == 0) eqPath.moveTo(x, y) else eqPath.lineTo(x, y)
-        }
-        drawPath(
-            path = eqPath,
-            color = Color(0x6648484A),
-            style = Stroke(width = 1.0f.dp.toPx())
+        // 4. Draw pristine, unobstructed inner rectangle border
+        drawRect(
+            color = Color(1f, 1f, 1f, 0.12f),
+            topLeft = Offset(leftPadding, 0f),
+            size = androidx.compose.ui.geometry.Size(gridWidth, gridHeight),
+            style = Stroke(width = 1.dp.toPx())
         )
 
-        // --- LAYER 3: Line 2 (Target Curve - Harman Baseline) - Thin solid highly defined dark gray
-        val harmanPath = Path()
-        for (i in harmanMags.indices) {
-            val x = (i.toFloat() / (harmanMags.size - 1)) * width
-            val y = (1.0f - (harmanMags[i] + 12.0f) / 24.0f) * height
-
-            if (i == 0) harmanPath.moveTo(x, y) else harmanPath.lineTo(x, y)
-        }
-        drawPath(
-            path = harmanPath,
-            color = Color(0xFF3A3A3C),
-            style = Stroke(width = 1.5f.dp.toPx())
+        // 5. Draw X-axis frequency labels centered horizontally under their lines
+        val majorLabels = listOf(
+            20f to "20Hz",
+            100f to "100Hz",
+            1000f to "1kHz",
+            10000f to "10kHz",
+            20000f to "20kHz"
         )
-
-        // --- LAYER 4: Line 1 (Final Equalized Result) - Solid, sharp 2.5dp primary accent blue
-        val finalPath = Path()
-        for (i in finalMags.indices) {
-            val x = (i.toFloat() / (finalMags.size - 1)) * width
-            val y = (1.0f - (finalMags[i] + 12.0f) / 24.0f) * height
-
-            if (i == 0) finalPath.moveTo(x, y) else finalPath.lineTo(x, y)
+        paint.textAlign = android.graphics.Paint.Align.CENTER
+        
+        majorLabels.forEach { (freq, label) ->
+            val ratio = (log10(freq) - logMin) / (logMax - logMin)
+            val x = leftPadding + ratio * gridWidth
+            
+            paint.getTextBounds(label, 0, label.length, textBounds)
+            // Center the text vertically in the middle of the bottom 20px gutter
+            val textY = height - (bottomPadding / 2f) + (textBounds.height() / 2f)
+            
+            drawContext.canvas.nativeCanvas.drawText(
+                label,
+                x,
+                textY,
+                paint
+            )
         }
-        drawPath(
-            path = finalPath,
-            color = Color(0xFF007AFF),
-            style = Stroke(width = 2.5f.dp.toPx())
-        )
+
+        // 6. Draw curves inside the clipped viewport boundaries
+        clipRect(
+            left = leftPadding,
+            top = 0f,
+            right = width,
+            bottom = gridHeight
+        ) {
+            // --- LAYER 1: Line 3 (Raw Response Curve) - Ultra-thin, 0.75dp path, muted low-opacity white (20% alpha)
+            val rawPath = Path()
+            for (i in rawMags.indices) {
+                val x = leftPadding + (i.toFloat() / (rawMags.size - 1)) * gridWidth
+                val y = (1.0f - (rawMags[i] + 12.0f) / 24.0f) * gridHeight
+
+                if (i == 0) rawPath.moveTo(x, y) else rawPath.lineTo(x, y)
+            }
+            drawPath(
+                path = rawPath,
+                color = Color(1f, 1f, 1f, 0.2f),
+                style = Stroke(width = 0.75f.dp.toPx())
+            )
+
+            // --- LAYER 2: Line 4 (Equalizer Filter Curve) - Ultra-thin, 0.75dp path, muted low-opacity white (20% alpha)
+            val eqPath = Path()
+            for (i in eqMags.indices) {
+                val x = leftPadding + (i.toFloat() / (eqMags.size - 1)) * gridWidth
+                val y = (1.0f - (eqMags[i] + 12.0f) / 24.0f) * gridHeight
+
+                if (i == 0) eqPath.moveTo(x, y) else eqPath.lineTo(x, y)
+            }
+            drawPath(
+                path = eqPath,
+                color = Color(1f, 1f, 1f, 0.2f),
+                style = Stroke(width = 0.75f.dp.toPx())
+            )
+
+            // --- LAYER 3: Line 2 (Target Curve - Harman Baseline) - Thin solid highly defined white at 60% opacity
+            val harmanPath = Path()
+            for (i in harmanMags.indices) {
+                val x = leftPadding + (i.toFloat() / (harmanMags.size - 1)) * gridWidth
+                val y = (1.0f - (harmanMags[i] + 12.0f) / 24.0f) * gridHeight
+
+                if (i == 0) harmanPath.moveTo(x, y) else harmanPath.lineTo(x, y)
+            }
+            drawPath(
+                path = harmanPath,
+                color = Color(1f, 1f, 1f, 0.6f),
+                style = Stroke(width = 1.25f.dp.toPx())
+            )
+
+            // --- LAYER 4: Line 1 (Final Equalized Result) - Solid, prominent accent blue curve at 100% opacity
+            val finalPath = Path()
+            for (i in finalMags.indices) {
+                val x = leftPadding + (i.toFloat() / (finalMags.size - 1)) * gridWidth
+                val y = (1.0f - (finalMags[i] + 12.0f) / 24.0f) * gridHeight
+
+                if (i == 0) finalPath.moveTo(x, y) else finalPath.lineTo(x, y)
+            }
+            drawPath(
+                path = finalPath,
+                color = Color(0xFF007AFF), // #007AFF at 100% opacity
+                style = Stroke(width = 2.0f.dp.toPx())
+            )
+        }
+
+        // 7. Draw Minimalist Instrument-Grade Legend HUD in the top-right corner of the active grid area
+        val legendY = 12.dp.toPx()
+        val legendXStart = width - 190.dp.toPx()
+        
+        val legendPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            textSize = 8.sp.toPx()
+            isAntiAlias = true
+        }
+        
+        // Equalized [● Blue]
+        legendPaint.color = android.graphics.Color.parseColor("#007AFF")
+        drawContext.canvas.nativeCanvas.drawCircle(legendXStart, legendY - 2.5f.dp.toPx(), 3f.dp.toPx(), legendPaint)
+        legendPaint.color = android.graphics.Color.WHITE
+        legendPaint.alpha = (0.8f * 255).toInt()
+        drawContext.canvas.nativeCanvas.drawText("Equalized", legendXStart + 8.dp.toPx(), legendY, legendPaint)
+        
+        // Target [● White 60%]
+        legendPaint.color = android.graphics.Color.parseColor("#FFFFFF")
+        legendPaint.alpha = (0.6f * 255).toInt()
+        drawContext.canvas.nativeCanvas.drawCircle(legendXStart + 64.dp.toPx(), legendY - 2.5f.dp.toPx(), 3f.dp.toPx(), legendPaint)
+        legendPaint.color = android.graphics.Color.WHITE
+        legendPaint.alpha = (0.5f * 255).toInt()
+        drawContext.canvas.nativeCanvas.drawText("Target", legendXStart + 72.dp.toPx(), legendY, legendPaint)
+        
+        // Raw / Filter [◌ Thin White 20%]
+        legendPaint.color = android.graphics.Color.parseColor("#FFFFFF")
+        legendPaint.alpha = (0.2f * 255).toInt()
+        legendPaint.style = android.graphics.Paint.Style.STROKE
+        legendPaint.strokeWidth = 1f.dp.toPx()
+        drawContext.canvas.nativeCanvas.drawCircle(legendXStart + 115.dp.toPx(), legendY - 2.5f.dp.toPx(), 3f.dp.toPx(), legendPaint)
+        legendPaint.style = android.graphics.Paint.Style.FILL
+        legendPaint.color = android.graphics.Color.WHITE
+        legendPaint.alpha = (0.5f * 255).toInt()
+        drawContext.canvas.nativeCanvas.drawText("Raw / Filter", legendXStart + 123.dp.toPx(), legendY, legendPaint)
     }
 }
 

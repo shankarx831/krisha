@@ -118,6 +118,62 @@ struct MenuBarView: View {
                     }
                 }
 
+                // One-Touch Install & Complete System Purge Engine Bar
+                HStack(spacing: 8) {
+                    Button(action: {
+                        Task {
+                            do {
+                                try await DriverInstaller().installDriver()
+                            } catch {
+                                print("Driver registration failed: \(error.localizedDescription)")
+                            }
+                        }
+                    }) {
+                        Text("Install Driver / Sync Setup")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color.blue.opacity(0.85))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button(action: {
+                        Task {
+                            do {
+                                try DriverInstaller().uninstallDriver()
+                            } catch {
+                                print("Driver purge failed: \(error.localizedDescription)")
+                            }
+                            
+                            let restartScript = "do shell script \"killall coreaudiod\" with administrator privileges"
+                            NSAppleScript(source: restartScript)?.executeAndReturnError(nil)
+                            
+                            if let bundleID = Bundle.main.bundleIdentifier {
+                                UserDefaults.standard.removePersistentDomain(forName: bundleID)
+                            }
+                            
+                            NSApp.terminate(nil)
+                        }
+                    }) {
+                        Text("Purge System Files")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color(red: 255/255.0, green: 59/255.0, blue: 48/255.0).opacity(0.85))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+
                 // Footer
                 QuitButton()
                     .padding(.horizontal, 8)

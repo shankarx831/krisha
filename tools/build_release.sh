@@ -27,10 +27,10 @@ build_swift_universal() {
     cd "$PACKAGE_DIR"
 
     echo "  Building arm64..."
-    swift build -c release --triple arm64-apple-macosx 2>&1 | tail -1
+    swift build -c release --triple arm64-apple-macosx --skip-update 2>&1 | tail -1
 
     echo "  Building x86_64..."
-    swift build -c release --triple x86_64-apple-macosx 2>&1 | tail -1
+    swift build -c release --triple x86_64-apple-macosx --skip-update 2>&1 | tail -1
 
     local ARM64_BIN=".build/arm64-apple-macosx/release/$PRODUCT_NAME"
     local X86_BIN=".build/x86_64-apple-macosx/release/$PRODUCT_NAME"

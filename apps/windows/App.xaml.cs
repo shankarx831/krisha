@@ -183,7 +183,7 @@ namespace KrishaSpoke.Windows
         {
             Title = "KRISHA Settings";
             Width = 460;
-            Height = 350;
+            Height = 430;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Background = new SolidColorBrush(Color.FromRgb(18, 18, 18));
             ResizeMode = ResizeMode.NoResize;
@@ -192,7 +192,8 @@ namespace KrishaSpoke.Windows
             Grid rootGrid = new Grid { Margin = new Thickness(24) };
             rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Title
             rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // Grid panel
-            rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Panic Button
+            rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Management Bar
+            rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Quit Row
 
             // Modern subtle title
             TextBlock titleLabel = new TextBlock
@@ -329,33 +330,134 @@ namespace KrishaSpoke.Windows
             _chkBypass.Unchecked += OnBypassChanged;
             cardPanel.Children.Add(_chkBypass);
 
-            // Uninstall / Panic Button at the bottom
-            Button btnUninstall = new Button
+            // One-Touch Install & Complete System Purge Engine Bar
+            Grid managementGrid = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+            managementGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            managementGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            Button btnInstall = new Button
             {
-                Content = "Uninstall Audio Driver (Panic Button)",
+                Content = "Install Driver / Sync Setup",
+                Background = new SolidColorBrush(Color.FromRgb(0, 122, 255)),
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 12,
+                Padding = new Thickness(10),
+                BorderThickness = new Thickness(0),
+                Margin = new Thickness(0, 0, 5, 0),
+                Cursor = Cursors.Hand
+            };
+
+            Button btnPurge = new Button
+            {
+                Content = "Purge System Files",
                 Background = new SolidColorBrush(Color.FromRgb(255, 59, 48)),
                 Foreground = Brushes.White,
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 12,
-                Padding = new Thickness(12),
+                Padding = new Thickness(10),
+                BorderThickness = new Thickness(0),
+                Margin = new Thickness(5, 0, 0, 0),
+                Cursor = Cursors.Hand
+            };
+
+            // Rounded corners templates for buttons
+            ControlTemplate btnTemplate = new ControlTemplate(typeof(Button));
+            FrameworkElementFactory borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+            borderFactory.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
+            FrameworkElementFactory presenterFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenterFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            presenterFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            borderFactory.AppendChild(presenterFactory);
+            btnTemplate.VisualTree = borderFactory;
+            btnInstall.Template = btnTemplate;
+            btnPurge.Template = btnTemplate;
+
+            btnInstall.Click += (s, e) =>
+            {
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Manage_sAPO.ps1");
+                        ProcessStartInfo psi = new ProcessStartInfo
+                        {
+                            FileName = "powershell.exe",
+                            Arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" -Install",
+                            Verb = "runas",
+                            UseShellExecute = true
+                        };
+                        Process.Start(psi);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Driver registration failed: {ex.Message}", "KRISHA Install Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                });
+            };
+
+            btnPurge.Click += (s, e) =>
+            {
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Manage_sAPO.ps1");
+                        ProcessStartInfo psi = new ProcessStartInfo
+                        {
+                            FileName = "powershell.exe",
+                            Arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" -Uninstall",
+                            Verb = "runas",
+                            UseShellExecute = true
+                        };
+                        var proc = Process.Start(psi);
+                        proc?.WaitForExit();
+
+                        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                        string krishaDir = Path.Combine(localAppData, "Krisha");
+                        if (Directory.Exists(krishaDir))
+                        {
+                            Directory.Delete(krishaDir, true);
+                        }
+
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            Application.Current.Shutdown();
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Purge failed: {ex.Message}", "KRISHA Purge Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                });
+            };
+
+            Grid.SetColumn(btnInstall, 0);
+            Grid.SetColumn(btnPurge, 1);
+            managementGrid.Children.Add(btnInstall);
+            managementGrid.Children.Add(btnPurge);
+
+            Grid.SetRow(managementGrid, 2);
+            rootGrid.Children.Add(managementGrid);
+
+            // Bottom Quit Row
+            Button btnQuit = new Button
+            {
+                Content = "Quit KRISHA",
+                Background = new SolidColorBrush(Color.FromRgb(44, 44, 46)),
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.Medium,
+                FontSize = 12,
+                Padding = new Thickness(8),
                 BorderThickness = new Thickness(0),
                 Cursor = Cursors.Hand
             };
-            // Rounded corners using a helper template
-            ControlTemplate template = new ControlTemplate(typeof(Button));
-            FrameworkElementFactory elem = new FrameworkElementFactory(typeof(Border));
-            elem.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
-            elem.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
-            FrameworkElementFactory presenter = new FrameworkElementFactory(typeof(ContentPresenter));
-            presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-            elem.AppendChild(presenter);
-            template.VisualTree = elem;
-            btnUninstall.Template = template;
+            btnQuit.Template = btnTemplate;
+            btnQuit.Click += (s, e) => Application.Current.Shutdown();
 
-            btnUninstall.Click += (s, e) => App.RunUninstallScript();
-            Grid.SetRow(btnUninstall, 2);
-            rootGrid.Children.Add(btnUninstall);
+            Grid.SetRow(btnQuit, 3);
+            rootGrid.Children.Add(btnQuit);
 
             Content = rootGrid;
         }

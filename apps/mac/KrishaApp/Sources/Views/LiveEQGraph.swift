@@ -201,45 +201,61 @@ struct LiveEQGraph: View {
     var body: some View {
         VStack(spacing: 4) {
             GeometryReader { geo in
-                ZStack {
-                    // Grid background
-                    gridBackground(size: geo.size)
+                let size = geo.size
+                let gridWidth = size.width - 45
+                let gridHeight = size.height - 20
+                
+                ZStack(alignment: .topLeading) {
+                    // 1. Grid Background & Curves (inside active area, clipped)
+                    ZStack {
+                        // Grid background lines
+                        gridBackground(size: CGSize(width: gridWidth, height: gridHeight))
+                        
+                        // Line 3: Raw Response (Ultra-thin path in white with low-opacity)
+                        curvePath(points: viewModel.rawPathPoints, size: CGSize(width: gridWidth, height: gridHeight))
+                            .stroke(Color.white.opacity(0.20), lineWidth: 0.75)
+                        
+                        // Line 4: Equalizer Filter (Ultra-thin path in white with low-opacity)
+                        curvePath(points: viewModel.eqPathPoints, size: CGSize(width: gridWidth, height: gridHeight))
+                            .stroke(Color.white.opacity(0.20), lineWidth: 0.75)
+                        
+                        // Line 2: Target Curve (Thin, solid highly defined white reference line)
+                        curvePath(points: viewModel.harmanPathPoints, size: CGSize(width: gridWidth, height: gridHeight))
+                            .stroke(Color.white.opacity(0.60), lineWidth: 1.25)
+                        
+                        // Line 1: Final Equalized Result (Solid accent blue curve)
+                        curvePath(points: viewModel.finalPathPoints, size: CGSize(width: gridWidth, height: gridHeight))
+                            .stroke(Color(red: 0.0, green: 0.48, blue: 1.0), lineWidth: 2.0)
+                    }
+                    .frame(width: gridWidth, height: gridHeight)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(white: 0.05))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                            )
+                    )
+                    .clipped()
+                    .offset(x: 45, y: 0)
                     
-                    // Line 3: Raw Response (Ultra-thin path in muted gray with low-opacity)
-                    curvePath(points: viewModel.rawPathPoints, size: geo.size)
-                        .stroke(Color(red: 0.28, green: 0.28, blue: 0.29).opacity(0.4), lineWidth: 1.0)
+                    // 2. Y-Axis labels in left gutter [0, 45]
+                    yAxisLabels(size: size)
                     
-                    // Line 4: Equalizer Filter (Ultra-thin path in muted gray with low-opacity)
-                    curvePath(points: viewModel.eqPathPoints, size: geo.size)
-                        .stroke(Color(red: 0.28, green: 0.28, blue: 0.29).opacity(0.4), lineWidth: 1.0)
-                    
-                    // Line 2: Target Curve (Thin, solid highly defined dark gray reference line)
-                    curvePath(points: viewModel.harmanPathPoints, size: geo.size)
-                        .stroke(Color(red: 0.23, green: 0.23, blue: 0.24), lineWidth: 1.5)
-                    
-                    // Line 1: Final Equalized Result (Solid accent blue curve)
-                    curvePath(points: viewModel.finalPathPoints, size: geo.size)
-                        .stroke(Color.blue, lineWidth: 2.0)
+                    // 3. X-Axis labels in bottom gutter [0, 20]
+                    xAxisLabels(size: size)
                     
                     // Hover Tooltip Marker & Text Overlay
                     if let location = hoverLocation {
-                        hoverOverlay(location: location, size: geo.size)
+                        hoverOverlay(location: location, size: size)
                     }
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(white: 0.05))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                        )
-                )
                 .contentShape(Rectangle())
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { val in
-                            if val.location.x >= 0 && val.location.x <= geo.size.width &&
-                                val.location.y >= 0 && val.location.y <= geo.size.height {
+                            if val.location.x >= 45 && val.location.x <= size.width &&
+                                val.location.y >= 0 && val.location.y <= size.height - 20 {
                                 hoverLocation = val.location
                             } else {
                                 hoverLocation = nil
@@ -250,21 +266,35 @@ struct LiveEQGraph: View {
                         }
                 )
             }
-            .frame(height: 130)
+            .frame(height: 150)
             
-            // X-axis Legend labels (Frequency steps)
-            HStack {
-                Text("20Hz").font(.system(size: 9, weight: .regular)).foregroundColor(.white.opacity(0.4))
-                Spacer()
-                Text("100Hz").font(.system(size: 9, weight: .regular)).foregroundColor(.white.opacity(0.4))
-                Spacer()
-                Text("1kHz").font(.system(size: 9, weight: .regular)).foregroundColor(.white.opacity(0.4))
-                Spacer()
-                Text("10kHz").font(.system(size: 9, weight: .regular)).foregroundColor(.white.opacity(0.4))
-                Spacer()
-                Text("20kHz").font(.system(size: 9, weight: .regular)).foregroundColor(.white.opacity(0.4))
+            // Minimalist Instrument-Grade Legend HUD Row
+            HStack(spacing: 16) {
+                HStack(spacing: 5) {
+                    Circle().fill(Color(red: 0.0, green: 0.48, blue: 1.0)).frame(width: 6, height: 6)
+                    Text("Equalized")
+                        .font(.system(size: 9, weight: .regular))
+                        .tracking(1.0)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                HStack(spacing: 5) {
+                    Circle().fill(Color.white.opacity(0.60)).frame(width: 6, height: 6)
+                    Text("Target")
+                        .font(.system(size: 9, weight: .regular))
+                        .tracking(1.0)
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                
+                HStack(spacing: 5) {
+                    Circle().stroke(Color.white.opacity(0.20), lineWidth: 1.0).frame(width: 6, height: 6)
+                    Text("Raw / Filter")
+                        .font(.system(size: 9, weight: .regular))
+                        .tracking(1.0)
+                        .foregroundColor(.white.opacity(0.5))
+                }
             }
-            .padding(.horizontal, 4)
+            .padding(.top, 4)
         }
     }
     
@@ -284,7 +314,7 @@ struct LiveEQGraph: View {
         return path
     }
     
-    // Sleek logarithmic vertical & horizontal grids
+    // Sleek logarithmic vertical & horizontal grids (drawn inside gridWidth/gridHeight)
     @ViewBuilder
     private func gridBackground(size: CGSize) -> some View {
         ZStack {
@@ -297,15 +327,8 @@ struct LiveEQGraph: View {
                     path.move(to: CGPoint(x: 0, y: yVal))
                     path.addLine(to: CGPoint(x: size.width, y: yVal))
                 }
-                .stroke(db == 0 ? Color.white.opacity(0.2) : Color.white.opacity(0.05),
+                .stroke(Color.white.opacity(0.12),
                         style: StrokeStyle(lineWidth: 1, dash: db == 0 ? [] : [2, 3]))
-                .overlay(
-                    Text("\(db > 0 ? "+" : "")\(db)dB")
-                        .font(.system(size: 8, weight: .regular))
-                        .foregroundColor(.white.opacity(0.3))
-                        .position(x: 25, y: yVal - 6),
-                    alignment: .topLeading
-                )
             }
             
             // Logarithmic vertical grid lines (20Hz, 100Hz, 1kHz, 10kHz, 20kHz are major lines)
@@ -315,14 +338,64 @@ struct LiveEQGraph: View {
                 let logMin = log10(20.0)
                 let logMax = log10(20000.0)
                 let ratio = CGFloat((log10(Double(freq)) - logMin) / (logMax - logMin))
-                let isMajor = freq == 20 || freq == 100 || freq == 1000 || freq == 10000 || freq == 20000
                 
                 Path { path in
                     path.move(to: CGPoint(x: ratio * size.width, y: 0))
                     path.addLine(to: CGPoint(x: ratio * size.width, y: size.height))
                 }
-                .stroke(isMajor ? Color.white.opacity(0.12) : Color.white.opacity(0.04),
-                        style: StrokeStyle(lineWidth: 1, dash: isMajor ? [] : [4, 4]))
+                .stroke(Color.white.opacity(0.12),
+                        style: StrokeStyle(lineWidth: 1, dash: freq == 20 || freq == 100 || freq == 1000 || freq == 10000 || freq == 20000 ? [] : [4, 4]))
+            }
+        }
+    }
+    
+    // Draw the Y-axis labels in the left gutter [0, 45] right-aligned to a clean axis line
+    @ViewBuilder
+    private func yAxisLabels(size: CGSize) -> some View {
+        let gridHeight = size.height - 20
+        ZStack {
+            Path { path in
+                path.move(to: CGPoint(x: 45, y: 0))
+                path.addLine(to: CGPoint(x: 45, y: gridHeight))
+            }
+            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            
+            ForEach([12, 6, 0, -6, -12], id: \.self) { db in
+                let yRatio = CGFloat((12.0 - Double(db)) / 24.0)
+                let yVal = yRatio * gridHeight
+                
+                Text("\(db > 0 ? "+" : "")\(db)dB")
+                    .font(.system(size: 8, weight: .regular))
+                    .foregroundColor(.white.opacity(0.4))
+                    .frame(width: 40, alignment: .trailing)
+                    .position(x: 20, y: yVal)
+            }
+        }
+    }
+    
+    // Draw the X-axis labels in the bottom gutter [0, 20] centered under grid lines
+    @ViewBuilder
+    private func xAxisLabels(size: CGSize) -> some View {
+        let gridWidth = size.width - 45
+        let majorFrequencies: [(Float, String)] = [
+            (20, "20Hz"),
+            (100, "100Hz"),
+            (1000, "1kHz"),
+            (10000, "10kHz"),
+            (20000, "20kHz")
+        ]
+        
+        ZStack {
+            ForEach(majorFrequencies, id: \.0) { freq, label in
+                let logMin = log10(20.0)
+                let logMax = log10(20000.0)
+                let ratio = CGFloat((log10(Double(freq)) - logMin) / (logMax - logMin))
+                let xVal = 45 + ratio * gridWidth
+                
+                Text(label)
+                    .font(.system(size: 8, weight: .regular))
+                    .foregroundColor(.white.opacity(0.4))
+                    .position(x: xVal, y: size.height - 10)
             }
         }
     }
@@ -330,7 +403,9 @@ struct LiveEQGraph: View {
     // Interactive hover helper
     @ViewBuilder
     private func hoverOverlay(location: CGPoint, size: CGSize) -> some View {
-        let xRatio = max(0, min(1.0, location.x / size.width))
+        let gridWidth = size.width - 45
+        let gridHeight = size.height - 20
+        let xRatio = max(0, min(1.0, (location.x - 45) / gridWidth))
         
         // Convert xRatio back to log frequency
         let logMin = log10(20.0)
@@ -345,27 +420,27 @@ struct LiveEQGraph: View {
         let harmanDb = viewModel.harmanPathPoints.indices.contains(index) ? 12.0 - Double(viewModel.harmanPathPoints[index].y * 24.0) : 0.0
         
         ZStack {
-            // vertical guide line
+            // vertical guide line inside the active area
             Path { path in
                 path.move(to: CGPoint(x: location.x, y: 0))
-                path.addLine(to: CGPoint(x: location.x, y: size.height))
+                path.addLine(to: CGPoint(x: location.x, y: gridHeight))
             }
             .stroke(Color.white.opacity(0.15), lineWidth: 1)
             
-            // Dot for Harman target
+            // Dot for Harman target (using mapped coordinate space)
             if viewModel.harmanPathPoints.indices.contains(index) {
                 Circle()
-                    .fill(Color(red: 0.23, green: 0.23, blue: 0.24))
+                    .fill(Color.white.opacity(0.60))
                     .frame(width: 5, height: 5)
-                    .position(x: location.x, y: viewModel.harmanPathPoints[index].y * size.height)
+                    .position(x: location.x, y: viewModel.harmanPathPoints[index].y * gridHeight)
             }
             
             // Dot for Final sound signature
             if viewModel.finalPathPoints.indices.contains(index) {
                 Circle()
-                    .fill(Color.blue)
+                    .fill(Color(red: 0.0, green: 0.48, blue: 1.0))
                     .frame(width: 5, height: 5)
-                    .position(x: location.x, y: viewModel.finalPathPoints[index].y * size.height)
+                    .position(x: location.x, y: viewModel.finalPathPoints[index].y * gridHeight)
             }
             
             // HUD panel displaying exact statistics
@@ -375,10 +450,10 @@ struct LiveEQGraph: View {
                     .foregroundColor(.white)
                 
                 HStack(spacing: 6) {
-                    Circle().fill(Color.blue).frame(width: 4, height: 4)
+                    Circle().fill(Color(red: 0.0, green: 0.48, blue: 1.0)).frame(width: 4, height: 4)
                     Text("Final: \(String(format: "%.1f", finalDb)) dB")
                         .font(.system(size: 9, weight: .regular))
-                        .foregroundColor(Color.blue)
+                        .foregroundColor(Color(red: 0.0, green: 0.48, blue: 1.0))
                 }
                 
                 HStack(spacing: 6) {
