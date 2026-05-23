@@ -66,6 +66,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// Data class containing the four synchronized magnitude response curves
+data class EQGraphData(
+    val harman: FloatArray,
+    val raw: FloatArray,
+    val eq: FloatArray,
+    val final: FloatArray
+)
+
 // Flat preset representational constant
 private val FlatPreset = AutoEqPresetResult(
     name = "Flat",
@@ -191,9 +199,10 @@ fun KrishaScreen() {
     
     // Magnitude curves
     val stepsCount = 120
-    var leftMagnitudes by remember { mutableStateOf(FloatArray(stepsCount)) }
-    var rightMagnitudes by remember { mutableStateOf(FloatArray(stepsCount)) }
-    var harmanMagnitudes by remember { mutableStateOf(FloatArray(stepsCount)) }
+    var harmanMags by remember { mutableStateOf(FloatArray(stepsCount)) }
+    var rawMags by remember { mutableStateOf(FloatArray(stepsCount)) }
+    var eqMags by remember { mutableStateOf(FloatArray(stepsCount)) }
+    var finalMags by remember { mutableStateOf(FloatArray(stepsCount)) }
 
     // Synchronize loaded preset coefficients into active DSP engine
     fun applyPresetToEngine(preset: AutoEqPresetResult) {
@@ -215,9 +224,10 @@ fun KrishaScreen() {
             val response = withContext(Dispatchers.Default) {
                 calculateBiquadMagnitudes(preampLeft, preampRight, isBypass, stepsCount)
             }
-            leftMagnitudes = response.first
-            rightMagnitudes = response.second
-            harmanMagnitudes = response.third
+            harmanMags = response.harman
+            rawMags = response.raw
+            eqMags = response.eq
+            finalMags = response.final
         }
     }
 
@@ -241,9 +251,10 @@ fun KrishaScreen() {
 
         // Dual magnitude visual graph
         EQResponseGraph(
-            leftMags = leftMagnitudes,
-            rightMags = rightMagnitudes,
-            harmanMags = harmanMagnitudes,
+            finalMags = finalMags,
+            harmanMags = harmanMags,
+            rawMags = rawMags,
+            eqMags = eqMags,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(200.dp)
@@ -267,12 +278,12 @@ fun KrishaScreen() {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 
-                // Calculate RMS deviation
+                // Calculate RMS deviation between Final response and Harman target
                 var rmsDeviation = 0.0f
                 var sumSq = 0.0f
                 for (i in 0 until stepsCount) {
-                    val activeDb = rightMagnitudes[i]
-                    val harmanDb = harmanMagnitudes[i]
+                    val activeDb = finalMags[i]
+                    val harmanDb = harmanMags[i]
                     val diff = activeDb - harmanDb
                     sumSq += diff * diff
                 }
@@ -710,103 +721,132 @@ fun KrishaScreen() {
 
 @Composable
 fun EQResponseGraph(
-    leftMags: FloatArray,
-    rightMags: FloatArray,
+    finalMags: FloatArray,
     harmanMags: FloatArray,
+    rawMags: FloatArray,
+    eqMags: FloatArray,
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
 
-        // Draw simple vertical logarithmic reference lines
-        val refFreqs = floatArrayOf(20f, 100f, 1000f, 10000f, 20000f)
+        // Draw standard & intermediate vertical logarithmic reference lines
+        // 20Hz, 100Hz, 1kHz, 10kHz, 20kHz are major lines
+        // 50Hz, 200Hz, 500Hz, 2kHz, 5kHz are intermediate lines
+        val refFreqs = floatArrayOf(20f, 50f, 100f, 200f, 500f, 1000f, 2000f, 5000f, 10000f, 20000f)
         val logMin = log10(20f)
         val logMax = log10(20000f)
+        
         refFreqs.forEach { f ->
             val ratio = (log10(f) - logMin) / (logMax - logMin)
             val x = ratio * width
+            val isMajor = f == 20f || f == 100f || f == 1000f || f == 10000f || f == 20000f
+            
             drawLine(
-                color = Color(0x1AFFFFFF),
+                color = if (isMajor) Color(0x26FFFFFF) else Color(0x0CFFFFFF),
                 start = Offset(x, 0f),
                 end = Offset(x, height),
-                strokeWidth = 1.dp.toPx()
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = if (isMajor) null else PathEffect.dashPathEffect(floatArrayOf(4f, 4f), 0f)
             )
         }
 
-        // Draw horizontal decibel grids (-12dB to +12dB)
-        val refDbs = floatArrayOf(-12f, 0f, 12f)
+        // Draw horizontal decibel grids (+12dB, +6dB, 0dB, -6dB, -12dB)
+        val refDbs = floatArrayOf(-12f, -6f, 0f, 6f, 12f)
         refDbs.forEach { db ->
             val ratio = 1f - (db + 12f) / 24f
             val y = ratio * height
             drawLine(
-                color = Color(0x1AFFFFFF),
+                color = if (db == 0f) Color(0x33FFFFFF) else Color(0x13FFFFFF),
                 start = Offset(0f, y),
                 end = Offset(width, y),
                 strokeWidth = 1.dp.toPx()
             )
         }
 
-        // 1. Draw Line B: Harman Reference Target Baseline (Muted, finely dashed, low-opacity gray/white)
+        // --- LAYER 1: Line 3 (Raw Response Curve) - Ultra-thin, 1.0dp path, muted low-opacity gray
+        val rawPath = Path()
+        for (i in rawMags.indices) {
+            val x = (i.toFloat() / (rawMags.size - 1)) * width
+            val y = (1.0f - (rawMags[i] + 12.0f) / 24.0f) * height
+
+            if (i == 0) rawPath.moveTo(x, y) else rawPath.lineTo(x, y)
+        }
+        drawPath(
+            path = rawPath,
+            color = Color(0x6648484A),
+            style = Stroke(width = 1.0f.dp.toPx())
+        )
+
+        // --- LAYER 2: Line 4 (Equalizer Filter Curve) - Ultra-thin, 1.0dp path, muted low-opacity gray
+        val eqPath = Path()
+        for (i in eqMags.indices) {
+            val x = (i.toFloat() / (eqMags.size - 1)) * width
+            val y = (1.0f - (eqMags[i] + 12.0f) / 24.0f) * height
+
+            if (i == 0) eqPath.moveTo(x, y) else eqPath.lineTo(x, y)
+        }
+        drawPath(
+            path = eqPath,
+            color = Color(0x6648484A),
+            style = Stroke(width = 1.0f.dp.toPx())
+        )
+
+        // --- LAYER 3: Line 2 (Target Curve - Harman Baseline) - Thin solid highly defined dark gray
         val harmanPath = Path()
         for (i in harmanMags.indices) {
             val x = (i.toFloat() / (harmanMags.size - 1)) * width
-            val gainDb = harmanMags[i].coerceIn(-12.0f, 12.0f)
-            val y = (1.0f - (gainDb + 12.0f) / 24.0f) * height
+            val y = (1.0f - (harmanMags[i] + 12.0f) / 24.0f) * height
 
             if (i == 0) harmanPath.moveTo(x, y) else harmanPath.lineTo(x, y)
         }
         drawPath(
             path = harmanPath,
-            color = Color.White.copy(alpha = 0.35f),
-            style = Stroke(
-                width = 1.5f.dp.toPx(),
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f)
-            )
+            color = Color(0xFF3A3A3C),
+            style = Stroke(width = 1.5f.dp.toPx())
         )
 
-        // 2. Draw Line A (Right/Active channel - Solid Accent Blue)
-        val activePath = Path()
-        for (i in rightMags.indices) {
-            val x = (i.toFloat() / (rightMags.size - 1)) * width
-            val gainDb = rightMags[i].coerceIn(-12.0f, 12.0f)
-            val y = (1.0f - (gainDb + 12.0f) / 24.0f) * height
+        // --- LAYER 4: Line 1 (Final Equalized Result) - Solid, sharp 2.5dp primary accent blue
+        val finalPath = Path()
+        for (i in finalMags.indices) {
+            val x = (i.toFloat() / (finalMags.size - 1)) * width
+            val y = (1.0f - (finalMags[i] + 12.0f) / 24.0f) * height
 
-            if (i == 0) activePath.moveTo(x, y) else activePath.lineTo(x, y)
+            if (i == 0) finalPath.moveTo(x, y) else finalPath.lineTo(x, y)
         }
         drawPath(
-            path = activePath,
+            path = finalPath,
             color = Color(0xFF007AFF),
             style = Stroke(width = 2.5f.dp.toPx())
-        )
-
-        // 3. Draw Left channel (Muted solid gray line)
-        val leftPath = Path()
-        for (i in leftMags.indices) {
-            val x = (i.toFloat() / (leftMags.size - 1)) * width
-            val gainDb = leftMags[i].coerceIn(-12.0f, 12.0f)
-            val y = (1.0f - (gainDb + 12.0f) / 24.0f) * height
-
-            if (i == 0) leftPath.moveTo(x, y) else leftPath.lineTo(x, y)
-        }
-        drawPath(
-            path = leftPath,
-            color = Color(0xFF8E8E93).copy(alpha = 0.6f),
-            style = Stroke(width = 1.5f.dp.toPx())
         )
     }
 }
 
-// Off-thread DSP calculations
+// Analog-style soft-clamping boundaries helper
+private fun softClamp(db: Float): Float {
+    val maxVal = 12.0f
+    val minVal = -12.0f
+    if (db > maxVal) {
+        return maxVal + 2.0f * tanh((db - maxVal) / 2.0f)
+    }
+    if (db < minVal) {
+        return minVal + 2.0f * tanh((db - minVal) / 2.0f)
+    }
+    return db
+}
+
+// Off-thread DSP calculations yielding 4 layered magnitude response curves
 private fun calculateBiquadMagnitudes(
     preampLeft: Float,
     preampRight: Float,
     isBypass: Boolean,
     steps: Int
-): Triple<FloatArray, FloatArray, FloatArray> {
-    val left = FloatArray(steps)
-    val right = FloatArray(steps)
+): EQGraphData {
     val harman = FloatArray(steps)
+    val raw = FloatArray(steps)
+    val eq = FloatArray(steps)
+    val final = FloatArray(steps)
 
     val logMin = log10(20.0)
     val logMax = log10(20000.0)
@@ -815,29 +855,46 @@ private fun calculateBiquadMagnitudes(
     for (i in 0 until steps) {
         val freq = 10.0.pow(logMin + i * step).toFloat()
         
-        // Query the static Harman Target Baseline
+        // Harman Target Curve Baseline (Line 2)
+        var harmanVal = 0.0f
         try {
-            harman[i] = KrishaJNI.queryJniHarmanTarget(freq)
+            harmanVal = KrishaJNI.queryJniHarmanTarget(freq)
         } catch (e: Exception) {
-            harman[i] = calculateHarmanFallback(freq)
+            harmanVal = calculateHarmanFallback(freq)
+        }
+        harman[i] = softClamp(harmanVal)
+
+        // Target EQ Response (optimal loaded preset configuration)
+        var targetEqVal = 0.0f
+        try {
+            targetEqVal = KrishaJNI.queryJniTargetMagnitude(freq, true)
+        } catch (e: Exception) {
+            targetEqVal = 0.0f
         }
 
+        // Predicted raw response of the headphone (Line 3): Raw = Harman - EQ_target
+        val rawVal = harmanVal - targetEqVal
+        raw[i] = softClamp(rawVal)
+
+        // Equalizer Filter response (Line 4): EQ_active
+        var eqVal = 0.0f
         if (isBypass) {
-            left[i] = preampLeft
-            right[i] = preampRight
+            eqVal = preampLeft
         } else {
             try {
-                // Query active magnitudes from C++ DSP engine
-                left[i] = KrishaJNI.queryJniMagnitude(freq, true)
-                right[i] = KrishaJNI.queryJniMagnitude(freq, false)
+                eqVal = KrishaJNI.queryJniMagnitude(freq, true)
             } catch (e: Exception) {
-                left[i] = preampLeft
-                right[i] = preampRight
+                eqVal = preampLeft
             }
         }
+        eq[i] = softClamp(eqVal)
+
+        // Equalized Final curve (Line 1): Final = Raw + EQ_active
+        val finalVal = rawVal + eqVal
+        final[i] = softClamp(finalVal)
     }
 
-    return Triple(left, right, harman)
+    return EQGraphData(harman, raw, eq, final)
 }
 
 private fun calculateHarmanFallback(frequencyHz: Float): Float {

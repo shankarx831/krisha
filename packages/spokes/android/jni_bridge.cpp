@@ -16,6 +16,7 @@
 extern "C" {
 
 static krisha_dsp_engine_t* g_dsp_engine = nullptr;
+static krisha_dsp_engine_t* g_target_engine = nullptr;
 
 static void ensure_dsp_engine() {
     if (!g_dsp_engine) {
@@ -24,6 +25,14 @@ static void ensure_dsp_engine() {
             krisha_preset_t preset;
             krisha_dsp_preset_init_flat(&preset);
             krisha_dsp_apply_preset(g_dsp_engine, &preset);
+        }
+    }
+    if (!g_target_engine) {
+        g_target_engine = krisha_dsp_create(48000);
+        if (g_target_engine) {
+            krisha_preset_t preset;
+            krisha_dsp_preset_init_flat(&preset);
+            krisha_dsp_apply_preset(g_target_engine, &preset);
         }
     }
 }
@@ -142,6 +151,9 @@ Java_com_krisha_spoke_android_KrishaJNI_applyPreset(
     }
 
     krisha_error_t err = krisha_dsp_apply_preset(g_dsp_engine, &preset);
+    if (g_target_engine) {
+        krisha_dsp_apply_preset(g_target_engine, &preset);
+    }
     return (err == KRISHA_OK) ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -171,6 +183,20 @@ Java_com_krisha_spoke_android_KrishaJNI_queryJniMagnitude(
         return 0.0f;
     }
     return krisha_dsp_get_magnitude_at_frequency(g_dsp_engine, frequencyHz, isLeft);
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_krisha_spoke_android_KrishaJNI_queryJniTargetMagnitude(
+    JNIEnv env,
+    jclass clazz,
+    jfloat frequencyHz,
+    jboolean isLeft
+) {
+    ensure_dsp_engine();
+    if (!g_target_engine) {
+        return 0.0f;
+    }
+    return krisha_dsp_get_magnitude_at_frequency(g_target_engine, frequencyHz, isLeft);
 }
 
 JNIEXPORT jfloat JNICALL

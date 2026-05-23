@@ -25,6 +25,7 @@ object KrishaJNI {
     external fun applyPreset(flatPresetArray: FloatArray): Boolean
     external fun updatePreamp(preampLeft: Float, preampRight: Float)
     external fun queryJniMagnitude(frequencyHz: Float, isLeft: Boolean): Float
+    external fun queryJniTargetMagnitude(frequencyHz: Float, isLeft: Boolean): Float
     external fun queryJniHarmanTarget(frequencyHz: Float): Float
 }
 

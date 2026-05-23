@@ -3,17 +3,19 @@ import Combine
 import CKrishaDSP
 
 class LiveEQGraphViewModel: ObservableObject {
-    @Published var activePathPoints: [CGPoint] = []
+    @Published var finalPathPoints: [CGPoint] = []
     @Published var harmanPathPoints: [CGPoint] = []
+    @Published var rawPathPoints: [CGPoint] = []
+    @Published var eqPathPoints: [CGPoint] = []
     
     private var cancellables = Set<AnyCancellable>()
     private let calculationQueue = DispatchQueue(label: "com.krisha.eq-graph-calc", qos: .userInteractive)
     
     init(presetManager: PresetManager) {
         // Observe all published values in PresetManager that affect the curve
-        // Combine multiple publishers to trigger recalculation on any change
         Publishers.MergeMany(
             presetManager.$isEnabled.map { _ in () }.eraseToAnyPublisher(),
+            presetManager.$currentPreset.map { _ in () }.eraseToAnyPublisher(),
             presetManager.$currentBands.map { _ in () }.eraseToAnyPublisher(),
             presetManager.$currentQFactors.map { _ in () }.eraseToAnyPublisher(),
             presetManager.$currentFilterTypes.map { _ in () }.eraseToAnyPublisher(),
@@ -22,7 +24,7 @@ class LiveEQGraphViewModel: ObservableObject {
             presetManager.$currentPreampLeftDb.map { _ in () }.eraseToAnyPublisher(),
             presetManager.$currentPreampRightDb.map { _ in () }.eraseToAnyPublisher()
         )
-        .debounce(for: .milliseconds(16), scheduler: RunLoop.main) // ~60fps throttle for ultra-efficiency
+        .debounce(for: .milliseconds(16), scheduler: RunLoop.main) // ~60fps throttle
         .sink { [weak self, weak presetManager] _ in
             guard let self = self, let pm = presetManager else { return }
             self.recalculateCurve(presetManager: pm)
@@ -31,6 +33,18 @@ class LiveEQGraphViewModel: ObservableObject {
         
         // Initial calculation
         recalculateCurve(presetManager: presetManager)
+    }
+    
+    // Analog-style soft-clamping boundaries helper
+    private func softClamp(_ db: Float) -> Float {
+        let maxVal: Float = 12.0
+        let minVal: Float = -12.0
+        if db > maxVal {
+            return maxVal + 2.0 * tanh((db - maxVal) / 2.0)
+        } else if db < minVal {
+            return minVal + 2.0 * tanh((db - minVal) / 2.0)
+        }
+        return db
     }
     
     func recalculateCurve(presetManager: PresetManager) {
@@ -45,6 +59,9 @@ class LiveEQGraphViewModel: ObservableObject {
         let preampRightDb = presetManager.currentPreampRightDb
         let limiterEnabled = presetManager.currentLimiterEnabled
         let limiterThresholdDb = presetManager.currentLimiterThresholdDb
+        
+        // Take a copy of the active preset to evaluate unmodified baseline targets
+        let activePreset = presetManager.currentPreset
         
         calculationQueue.async { [weak self] in
             guard let self = self else { return }
@@ -62,22 +79,28 @@ class LiveEQGraphViewModel: ObservableObject {
                 testFrequencies.append(pow(10.0, logFreq))
             }
             
-            // Instantiate transient offline DSP engine to evaluate the mathematical curve
-            guard let offlineEngine = krisha_dsp_create(48000) else { return }
+            // Instantiate transient active and target engines
+            guard let activeEngine = krisha_dsp_create(48000) else { return }
+            guard let targetEngine = krisha_dsp_create(48000) else {
+                krisha_dsp_destroy(activeEngine)
+                return
+            }
             defer {
-                krisha_dsp_destroy(offlineEngine)
+                krisha_dsp_destroy(activeEngine)
+                krisha_dsp_destroy(targetEngine)
             }
             
-            var preset = krisha_preset_t()
-            krisha_dsp_preset_init_flat(&preset)
-            preset.num_bands = 10
-            preset.preamp_db = preampDb
-            preset.preamp_left_db = preampLeftDb
-            preset.preamp_right_db = preampRightDb
-            preset.limiter_enabled = limiterEnabled
-            preset.limiter_threshold_db = limiterThresholdDb
+            // 1. Configure the Active EQ Engine
+            var activeCPreset = krisha_preset_t()
+            krisha_dsp_preset_init_flat(&activeCPreset)
+            activeCPreset.num_bands = 10
+            activeCPreset.preamp_db = preampDb
+            activeCPreset.preamp_left_db = preampLeftDb
+            activeCPreset.preamp_right_db = preampRightDb
+            activeCPreset.limiter_enabled = limiterEnabled
+            activeCPreset.limiter_threshold_db = limiterThresholdDb
             
-            withUnsafeMutablePointer(to: &preset.bands) { bandsPtr in
+            withUnsafeMutablePointer(to: &activeCPreset.bands) { bandsPtr in
                 let rawPtr = UnsafeMutableRawPointer(bandsPtr)
                 let bandsArray = rawPtr.assumingMemoryBound(to: krisha_band_t.self)
                 for i in 0..<10 {
@@ -89,39 +112,76 @@ class LiveEQGraphViewModel: ObservableObject {
                     bandsArray[i].enabled = isEnabled && (abs(gain) > 0.01)
                 }
             }
+            krisha_dsp_apply_preset(activeEngine, &activeCPreset)
             
-            let applyResult = krisha_dsp_apply_preset(offlineEngine, &preset)
-            guard applyResult == KRISHA_OK else { return }
+            // 2. Configure the Baseline Target EQ Engine (using optimal loaded configuration parameters)
+            if let targetPreset = activePreset {
+                var targetCPreset = krisha_preset_t()
+                krisha_dsp_preset_init_flat(&targetCPreset)
+                targetCPreset.num_bands = UInt32(targetPreset.bands.count)
+                targetCPreset.preamp_db = targetPreset.preampDb
+                targetCPreset.preamp_left_db = targetPreset.preampLeftDb
+                targetCPreset.preamp_right_db = targetPreset.preampRightDb
+                targetCPreset.limiter_enabled = targetPreset.limiterEnabled
+                targetCPreset.limiter_threshold_db = targetPreset.limiterThresholdDb
+                
+                withUnsafeMutablePointer(to: &targetCPreset.bands) { bandsPtr in
+                    let rawPtr = UnsafeMutableRawPointer(bandsPtr)
+                    let bandsArray = rawPtr.assumingMemoryBound(to: krisha_band_t.self)
+                    for i in 0..<Int(targetCPreset.num_bands) {
+                        let band = targetPreset.bands[i]
+                        bandsArray[i].frequency_hz = band.frequencyHz
+                        bandsArray[i].gain_db = band.enabled ? band.gainDb : 0.0
+                        bandsArray[i].q_factor = band.qFactor
+                        bandsArray[i].type = krisha_filter_type_t(UInt32(band.filterType.rawValue))
+                        bandsArray[i].enabled = band.enabled
+                    }
+                }
+                krisha_dsp_apply_preset(targetEngine, &targetCPreset)
+            }
             
-            var activePoints: [CGPoint] = []
+            var finalPoints: [CGPoint] = []
             var harmanPoints: [CGPoint] = []
+            var rawPoints: [CGPoint] = []
+            var eqPoints: [CGPoint] = []
             
             for i in 0..<120 {
                 let freq = testFrequencies[i]
                 
-                // Vector A: Active signature (Left channel magnitude response)
-                let activeDb = krisha_dsp_get_magnitude_at_frequency(offlineEngine, freq, true)
-                // Vector B: Harman reference baseline magnitude
+                // Fetch the core baseline target
                 let harmanDb = krisha_dsp_get_harman_target_at_frequency(freq)
                 
-                // x is standardized in [0, 1] range representing log frequency
+                // Fetch active filter magnitude response
+                let eqDb = krisha_dsp_get_magnitude_at_frequency(activeEngine, freq, true)
+                
+                // Fetch unmodified optimal target preset response
+                let targetEqDb = (activePreset != nil) ? krisha_dsp_get_magnitude_at_frequency(targetEngine, freq, true) : 0.0
+                
+                // Predicted raw response of the headphone: Raw = Harman - EQ_target
+                let rawDb = harmanDb - targetEqDb
+                
+                // Predicted equalized response of the headphone: Final = Raw + EQ_active
+                let finalDb = rawDb + eqDb
+                
                 let x = CGFloat(i) / 119.0
                 
-                // Cap DB between -12dB and +12dB
-                let capActiveDb = max(-12.0, min(12.0, activeDb))
-                let capHarmanDb = max(-12.0, min(12.0, harmanDb))
+                // Apply soft visual boundary clamping to prevent flatlining coordinates at extremes
+                let yFinal = CGFloat((12.0 - self.softClamp(finalDb)) / 24.0)
+                let yHarman = CGFloat((12.0 - self.softClamp(harmanDb)) / 24.0)
+                let yRaw = CGFloat((12.0 - self.softClamp(rawDb)) / 24.0)
+                let yEq = CGFloat((12.0 - self.softClamp(eqDb)) / 24.0)
                 
-                // y is standardized in [0, 1] range where 0 is +12dB and 1 is -12dB
-                let yActive = CGFloat((12.0 - capActiveDb) / 24.0)
-                let yHarman = CGFloat((12.0 - capHarmanDb) / 24.0)
-                
-                activePoints.append(CGPoint(x: x, y: yActive))
+                finalPoints.append(CGPoint(x: x, y: yFinal))
                 harmanPoints.append(CGPoint(x: x, y: yHarman))
+                rawPoints.append(CGPoint(x: x, y: yRaw))
+                eqPoints.append(CGPoint(x: x, y: yEq))
             }
             
             DispatchQueue.main.async {
-                self.activePathPoints = activePoints
+                self.finalPathPoints = finalPoints
                 self.harmanPathPoints = harmanPoints
+                self.rawPathPoints = rawPoints
+                self.eqPathPoints = eqPoints
             }
         }
     }
@@ -140,19 +200,26 @@ struct LiveEQGraph: View {
     
     var body: some View {
         VStack(spacing: 4) {
-            // Draw coordinate chart
             GeometryReader { geo in
                 ZStack {
-                    // Minimal grid background
+                    // Grid background
                     gridBackground(size: geo.size)
                     
-                    // Line B: Harman Reference Baseline (Muted Fine Dashed Translucent Gray/White)
-                    curvePath(points: viewModel.harmanPathPoints, size: geo.size)
-                        .stroke(Color.white.opacity(0.15), style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                    // Line 3: Raw Response (Ultra-thin path in muted gray with low-opacity)
+                    curvePath(points: viewModel.rawPathPoints, size: geo.size)
+                        .stroke(Color(red: 0.28, green: 0.28, blue: 0.29).opacity(0.4), lineWidth: 1.0)
                     
-                    // Line A: Active Sound Signature ( Crisp System Blue Accent)
-                    curvePath(points: viewModel.activePathPoints, size: geo.size)
-                        .stroke(Color.blue, lineWidth: 1.5)
+                    // Line 4: Equalizer Filter (Ultra-thin path in muted gray with low-opacity)
+                    curvePath(points: viewModel.eqPathPoints, size: geo.size)
+                        .stroke(Color(red: 0.28, green: 0.28, blue: 0.29).opacity(0.4), lineWidth: 1.0)
+                    
+                    // Line 2: Target Curve (Thin, solid highly defined dark gray reference line)
+                    curvePath(points: viewModel.harmanPathPoints, size: geo.size)
+                        .stroke(Color(red: 0.23, green: 0.23, blue: 0.24), lineWidth: 1.5)
+                    
+                    // Line 1: Final Equalized Result (Solid accent blue curve)
+                    curvePath(points: viewModel.finalPathPoints, size: geo.size)
+                        .stroke(Color.blue, lineWidth: 2.0)
                     
                     // Hover Tooltip Marker & Text Overlay
                     if let location = hoverLocation {
@@ -217,12 +284,12 @@ struct LiveEQGraph: View {
         return path
     }
     
-    // Sleek grid helper
+    // Sleek logarithmic vertical & horizontal grids
     @ViewBuilder
     private func gridBackground(size: CGSize) -> some View {
         ZStack {
             // Horizontal lines (dB Steps: +12, +6, 0, -6, -12)
-            ForEach([6, 0, -6], id: \.self) { db in
+            ForEach([12, 6, 0, -6, -12], id: \.self) { db in
                 let yRatio = CGFloat((12.0 - Double(db)) / 24.0)
                 let yVal = yRatio * size.height
                 
@@ -241,18 +308,21 @@ struct LiveEQGraph: View {
                 )
             }
             
-            // Vertical log lines (Freq steps)
-            let keyFrequencies: [Float] = [50, 100, 200, 500, 1000, 2000, 5000, 10000]
+            // Logarithmic vertical grid lines (20Hz, 100Hz, 1kHz, 10kHz, 20kHz are major lines)
+            // (50Hz, 200Hz, 500Hz, 2kHz, 5kHz are intermediate lines)
+            let keyFrequencies: [Float] = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
             ForEach(keyFrequencies, id: \.self) { freq in
                 let logMin = log10(20.0)
                 let logMax = log10(20000.0)
                 let ratio = CGFloat((log10(Double(freq)) - logMin) / (logMax - logMin))
+                let isMajor = freq == 20 || freq == 100 || freq == 1000 || freq == 10000 || freq == 20000
                 
                 Path { path in
                     path.move(to: CGPoint(x: ratio * size.width, y: 0))
                     path.addLine(to: CGPoint(x: ratio * size.width, y: size.height))
                 }
-                .stroke(Color.white.opacity(0.04), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                .stroke(isMajor ? Color.white.opacity(0.12) : Color.white.opacity(0.04),
+                        style: StrokeStyle(lineWidth: 1, dash: isMajor ? [] : [4, 4]))
             }
         }
     }
@@ -271,7 +341,7 @@ struct LiveEQGraph: View {
         // Find nearest point index in viewModel
         let index = min(119, max(0, Int(xRatio * 119)))
         
-        let activeDb = viewModel.activePathPoints.indices.contains(index) ? 12.0 - Double(viewModel.activePathPoints[index].y * 24.0) : 0.0
+        let finalDb = viewModel.finalPathPoints.indices.contains(index) ? 12.0 - Double(viewModel.finalPathPoints[index].y * 24.0) : 0.0
         let harmanDb = viewModel.harmanPathPoints.indices.contains(index) ? 12.0 - Double(viewModel.harmanPathPoints[index].y * 24.0) : 0.0
         
         ZStack {
@@ -282,23 +352,23 @@ struct LiveEQGraph: View {
             }
             .stroke(Color.white.opacity(0.15), lineWidth: 1)
             
-            // Dot for Harman reference
+            // Dot for Harman target
             if viewModel.harmanPathPoints.indices.contains(index) {
                 Circle()
-                    .fill(Color.white.opacity(0.4))
+                    .fill(Color(red: 0.23, green: 0.23, blue: 0.24))
                     .frame(width: 5, height: 5)
                     .position(x: location.x, y: viewModel.harmanPathPoints[index].y * size.height)
             }
             
-            // Dot for Active sound signature
-            if viewModel.activePathPoints.indices.contains(index) {
+            // Dot for Final sound signature
+            if viewModel.finalPathPoints.indices.contains(index) {
                 Circle()
                     .fill(Color.blue)
                     .frame(width: 5, height: 5)
-                    .position(x: location.x, y: viewModel.activePathPoints[index].y * size.height)
+                    .position(x: location.x, y: viewModel.finalPathPoints[index].y * size.height)
             }
             
-            // HUD panel displaying exact statistics comparing both
+            // HUD panel displaying exact statistics
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(Int(freq)) Hz")
                     .font(.system(size: 10, weight: .bold))
@@ -306,14 +376,14 @@ struct LiveEQGraph: View {
                 
                 HStack(spacing: 6) {
                     Circle().fill(Color.blue).frame(width: 4, height: 4)
-                    Text("Active: \(String(format: "%.1f", activeDb)) dB")
+                    Text("Final: \(String(format: "%.1f", finalDb)) dB")
                         .font(.system(size: 9, weight: .regular))
                         .foregroundColor(Color.blue)
                 }
                 
                 HStack(spacing: 6) {
                     Circle().fill(Color.white.opacity(0.5)).frame(width: 4, height: 4)
-                    Text("Harman: \(String(format: "%.1f", harmanDb)) dB")
+                    Text("Target: \(String(format: "%.1f", harmanDb)) dB")
                         .font(.system(size: 9, weight: .regular))
                         .foregroundColor(.white.opacity(0.7))
                 }

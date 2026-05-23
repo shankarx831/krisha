@@ -7,6 +7,7 @@ namespace KrishaSpoke.Windows
     /// <summary>
     /// Thread-safe C# wrapper that P/Invokes into the native C++ DSP core library
     /// to retrieve magnitude responses and calculate logarithmic graphs.
+    /// Supports the Phase 2 multi-curve acoustics redesign.
     /// </summary>
     public class EQGraph
     {
@@ -32,27 +33,31 @@ namespace KrishaSpoke.Windows
         // Fields & Properties
         // ============================================================================
         
-        private readonly IntPtr _tempEngine;
+        private readonly IntPtr _activeEngine;
+        private readonly IntPtr _targetEngine;
         private readonly object _lock = new object();
         private const int StepsCount = 120;
         private readonly float[] _logFrequencies;
 
-        public float[] LeftMagnitudes { get; private set; }
-        public float[] RightMagnitudes { get; private set; }
         public float[] HarmanTargetMagnitudes { get; private set; }
+        public float[] RawResponseMagnitudes { get; private set; }
+        public float[] EqualizerFilterMagnitudes { get; private set; }
+        public float[] EqualizedFinalMagnitudes { get; private set; }
 
         public EQGraph(uint sampleRate = 48000)
         {
-            // Create a transient DSP engine for off-thread graph evaluation
+            // Instantiate lock-free active and target engines for off-thread calculation
             lock (_lock)
             {
-                _tempEngine = KrishaDspCreate(sampleRate);
+                _activeEngine = KrishaDspCreate(sampleRate);
+                _targetEngine = KrishaDspCreate(sampleRate);
             }
 
             _logFrequencies = new float[StepsCount];
-            LeftMagnitudes = new float[StepsCount];
-            RightMagnitudes = new float[StepsCount];
             HarmanTargetMagnitudes = new float[StepsCount];
+            RawResponseMagnitudes = new float[StepsCount];
+            EqualizerFilterMagnitudes = new float[StepsCount];
+            EqualizedFinalMagnitudes = new float[StepsCount];
 
             PrecomputeLogarithmicSteps();
         }
@@ -61,11 +66,33 @@ namespace KrishaSpoke.Windows
         {
             lock (_lock)
             {
-                if (_tempEngine != IntPtr.Zero)
+                if (_activeEngine != IntPtr.Zero)
                 {
-                    KrishaDspDestroy(_tempEngine);
+                    KrishaDspDestroy(_activeEngine);
+                }
+                if (_targetEngine != IntPtr.Zero)
+                {
+                    KrishaDspDestroy(_targetEngine);
                 }
             }
+        }
+
+        /// <summary>
+        /// Analog-style soft-clamping boundaries helper to prevent visual flatlining
+        /// </summary>
+        private static float SoftClamp(float db)
+        {
+            float maxVal = 12.0f;
+            float minVal = -12.0f;
+            if (db > maxVal)
+            {
+                return maxVal + 2.0f * (float)Math.Tanh((db - maxVal) / 2.0f);
+            }
+            else if (db < minVal)
+            {
+                return minVal + 2.0f * (float)Math.Tanh((db - minVal) / 2.0f);
+            }
+            return db;
         }
 
         /// <summary>
@@ -85,7 +112,7 @@ namespace KrishaSpoke.Windows
 
         /// <summary>
         /// Asynchronously evaluates the 120 logarithmic steps on a background queue
-        /// to guarantee the main rendering thread is never blocked.
+        /// yielding four synchronized response curves with analog soft-clamping.
         /// </summary>
         public Task CalculateResponseAsync()
         {
@@ -93,24 +120,35 @@ namespace KrishaSpoke.Windows
             {
                 lock (_lock)
                 {
-                    if (_tempEngine == IntPtr.Zero) return;
+                    if (_activeEngine == IntPtr.Zero || _targetEngine == IntPtr.Zero) return;
 
-                    float[] leftTemp = new float[StepsCount];
-                    float[] rightTemp = new float[StepsCount];
                     float[] harmanTemp = new float[StepsCount];
+                    float[] rawTemp = new float[StepsCount];
+                    float[] eqTemp = new float[StepsCount];
+                    float[] finalTemp = new float[StepsCount];
 
                     for (int i = 0; i < StepsCount; i++)
                     {
                         float freq = _logFrequencies[i];
-                        leftTemp[i] = KrishaDspGetMagnitudeAtFrequency(_tempEngine, freq, true);
-                        rightTemp[i] = KrishaDspGetMagnitudeAtFrequency(_tempEngine, freq, false);
-                        harmanTemp[i] = KrishaDspGetHarmanTargetAtFrequency(freq);
+                        
+                        float harmanDb = KrishaDspGetHarmanTargetAtFrequency(freq);
+                        float activeDb = KrishaDspGetMagnitudeAtFrequency(_activeEngine, freq, true);
+                        float targetEqDb = KrishaDspGetMagnitudeAtFrequency(_targetEngine, freq, true);
+                        
+                        float rawDb = harmanDb - targetEqDb;
+                        float finalDb = rawDb + activeDb;
+
+                        harmanTemp[i] = SoftClamp(harmanDb);
+                        rawTemp[i] = SoftClamp(rawDb);
+                        eqTemp[i] = SoftClamp(activeDb);
+                        finalTemp[i] = SoftClamp(finalDb);
                     }
 
                     // Atomic swap to avoid UI thread race conditions
-                    LeftMagnitudes = leftTemp;
-                    RightMagnitudes = rightTemp;
                     HarmanTargetMagnitudes = harmanTemp;
+                    RawResponseMagnitudes = rawTemp;
+                    EqualizerFilterMagnitudes = eqTemp;
+                    EqualizedFinalMagnitudes = finalTemp;
                 }
             });
         }

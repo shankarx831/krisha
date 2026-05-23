@@ -1,6 +1,7 @@
 /**
  * @file main.cpp
  * @brief Linux GTK4 and Cairo System Tray Spoke wrapping the frozen C++ DSP Core.
+ * Supports Phase 2 dynamic multi-curve logarithmic graphing updates.
  */
 
 #include <gtk/gtk.h>
@@ -11,6 +12,7 @@
 #include "krisha_dsp.h"
 
 static krisha_dsp_engine_t* g_dsp_engine = nullptr;
+static krisha_dsp_engine_t* g_target_engine = nullptr;
 static GtkWidget* g_graph_drawing_area = nullptr;
 static float g_preamp_left = 0.0f;
 static float g_preamp_right = 0.0f;
@@ -30,22 +32,44 @@ static void precompute_logarithmic_steps() {
     }
 }
 
+// Analog-style soft-clamping boundaries helper to prevent visual flatlining
+static float soft_clamp(float db) {
+    const float min_val = -12.0f;
+    const float max_val = 12.0f;
+    if (db > max_val) {
+        return max_val + 2.0f * std::tanh((db - max_val) / 2.0f);
+    } else if (db < min_val) {
+        return min_val + 2.0f * std::tanh((db - min_val) / 2.0f);
+    }
+    return db;
+}
+
 // Cairo drawing callback for high-performance logarithmic response plotting
 static void on_draw_cairo(GtkDrawingArea* drawing_area, cairo_t* cr, int width, int height, gpointer user_data) {
     // Clear background with premium slate gray (#121214)
     cairo_set_source_rgb(cr, 0.07, 0.07, 0.08);
     cairo_paint(cr);
 
-    // Draw grid lines
-    cairo_set_line_width(cr, 1.0);
-    cairo_set_source_rgba(cr, 0.2, 0.2, 0.25, 0.4);
-
-    // Frequencies grid (20Hz, 100Hz, 1kHz, 10kHz, 20kHz)
-    std::vector<float> grid_freqs = {20, 100, 1000, 10000, 20000};
     double log_min = std::log10(20.0);
     double log_max = std::log10(20000.0);
 
-    for (float f : grid_freqs) {
+    // 1. Draw horizontal decibel grids (+12dB, +6dB, 0dB, -6dB, -12dB)
+    std::vector<float> grid_dbs = {12.0f, 6.0f, 0.0f, -6.0f, -12.0f};
+    cairo_set_line_width(cr, 1.0);
+    for (float db : grid_dbs) {
+        double y_ratio = 1.0 - (db + 12.0) / 24.0;
+        double y = y_ratio * height;
+        cairo_set_source_rgba(cr, 0.2, 0.2, 0.25, db == 0.0f ? 0.3 : 0.08);
+        cairo_move_to(cr, 0, y);
+        cairo_line_to(cr, width, y);
+        cairo_stroke(cr);
+    }
+
+    // 2. Draw vertical logarithmic grid lines
+    // Major vertical lines (20Hz, 100Hz, 1kHz, 10kHz, 20kHz)
+    std::vector<float> major_freqs = {20, 100, 1000, 10000, 20000};
+    cairo_set_source_rgba(cr, 0.2, 0.2, 0.25, 0.25);
+    for (float f : major_freqs) {
         double x_ratio = (std::log10(f) - log_min) / (log_max - log_min);
         double x = x_ratio * width;
         cairo_move_to(cr, x, 0);
@@ -53,64 +77,95 @@ static void on_draw_cairo(GtkDrawingArea* drawing_area, cairo_t* cr, int width, 
         cairo_stroke(cr);
     }
 
-    // Decibel grid (+12dB, 0dB, -12dB)
-    std::vector<float> grid_dbs = {12.0f, 0.0f, -12.0f};
-    for (float db : grid_dbs) {
-        double y_ratio = 1.0 - (db + 12.0) / 24.0;
-        double y = y_ratio * height;
-        cairo_move_to(cr, 0, y);
-        cairo_line_to(cr, width, y);
+    // Intermediate vertical log lines (50Hz, 200Hz, 500Hz, 2kHz, 5kHz)
+    std::vector<float> inter_freqs = {50, 200, 500, 2000, 5000};
+    cairo_set_source_rgba(cr, 0.2, 0.2, 0.25, 0.08);
+    double inter_dashes[] = {4.0, 4.0};
+    cairo_set_dash(cr, inter_dashes, 2, 0.0);
+    for (float f : inter_freqs) {
+        double x_ratio = (std::log10(f) - log_min) / (log_max - log_min);
+        double x = x_ratio * width;
+        cairo_move_to(cr, x, 0);
+        cairo_line_to(cr, x, height);
         cairo_stroke(cr);
     }
+    cairo_set_dash(cr, nullptr, 0, 0.0); // Reset dash
 
-    if (!g_dsp_engine || g_bypass) return;
+    if (!g_dsp_engine || !g_target_engine) return;
 
-    // Line B: Harman Reference Baseline (Muted Fine Dashed Translucent Gray/White)
-    cairo_set_line_width(cr, 1.5);
-    cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.15);
-    double dashes[] = {4.0, 4.0};
-    cairo_set_dash(cr, dashes, 2, 0.0);
-    bool first = true;
+    // Precompute the 4 synchronize magnitude curves
+    std::vector<float> harman_curve(STEPS_COUNT);
+    std::vector<float> raw_curve(STEPS_COUNT);
+    std::vector<float> eq_curve(STEPS_COUNT);
+    std::vector<float> final_curve(STEPS_COUNT);
+
+    for (int i = 0; i < STEPS_COUNT; i++) {
+        float freq = g_frequencies[i];
+        float harman_db = krisha_dsp_get_harman_target_at_frequency(freq);
+        float eq_db = g_bypass ? g_preamp_left : krisha_dsp_get_magnitude_at_frequency(g_dsp_engine, freq, true);
+        float target_eq_db = krisha_dsp_get_magnitude_at_frequency(g_target_engine, freq, true);
+        float raw_db = harman_db - target_eq_db;
+        float final_db = raw_db + eq_db;
+
+        harman_curve[i] = soft_clamp(harman_db);
+        raw_curve[i] = soft_clamp(raw_db);
+        eq_curve[i] = soft_clamp(eq_db);
+        final_curve[i] = soft_clamp(final_db);
+    }
+
+    // --- LAYER 1: Line 3 (Raw Response Curve - Ultra-thin low-opacity gray)
+    cairo_set_line_width(cr, 1.0);
+    cairo_set_source_rgba(cr, 0.28, 0.28, 0.29, 0.4);
     for (int i = 0; i < STEPS_COUNT; i++) {
         double x_ratio = (double)i / (STEPS_COUNT - 1);
         double x = x_ratio * width;
-
-        float gain_db = krisha_dsp_get_harman_target_at_frequency(g_frequencies[i]);
-        double y_ratio = 1.0 - (gain_db + 12.0) / 24.0;
-        y_ratio = std::max(0.0, std::min(1.0, y_ratio));
+        double y_ratio = 1.0 - (raw_curve[i] + 12.0) / 24.0;
         double y = y_ratio * height;
 
-        if (first) {
-            cairo_move_to(cr, x, y);
-            first = false;
-        } else {
-            cairo_line_to(cr, x, y);
-        }
+        if (i == 0) cairo_move_to(cr, x, y);
+        else cairo_line_to(cr, x, y);
     }
     cairo_stroke(cr);
 
-    // Reset dash for Line A
-    cairo_set_dash(cr, nullptr, 0, 0.0);
-
-    // Line A: Active Correction Sound Signature (Crisp System Blue Accent)
-    cairo_set_line_width(cr, 1.5);
-    cairo_set_source_rgb(cr, 0.0, 0.48, 1.0);
-    first = true;
+    // --- LAYER 2: Line 4 (Equalizer Filter Curve - Ultra-thin low-opacity gray)
+    cairo_set_line_width(cr, 1.0);
+    cairo_set_source_rgba(cr, 0.28, 0.28, 0.29, 0.4);
     for (int i = 0; i < STEPS_COUNT; i++) {
         double x_ratio = (double)i / (STEPS_COUNT - 1);
         double x = x_ratio * width;
-
-        float gain_db = krisha_dsp_get_magnitude_at_frequency(g_dsp_engine, g_frequencies[i], true);
-        double y_ratio = 1.0 - (gain_db + 12.0) / 24.0;
-        y_ratio = std::max(0.0, std::min(1.0, y_ratio));
+        double y_ratio = 1.0 - (eq_curve[i] + 12.0) / 24.0;
         double y = y_ratio * height;
 
-        if (first) {
-            cairo_move_to(cr, x, y);
-            first = false;
-        } else {
-            cairo_line_to(cr, x, y);
-        }
+        if (i == 0) cairo_move_to(cr, x, y);
+        else cairo_line_to(cr, x, y);
+    }
+    cairo_stroke(cr);
+
+    // --- LAYER 3: Line 2 (Target Curve - Harman Baseline - Thin solid dark gray)
+    cairo_set_line_width(cr, 1.5);
+    cairo_set_source_rgb(cr, 0.23, 0.23, 0.24); // #3A3A3C
+    for (int i = 0; i < STEPS_COUNT; i++) {
+        double x_ratio = (double)i / (STEPS_COUNT - 1);
+        double x = x_ratio * width;
+        double y_ratio = 1.0 - (harman_curve[i] + 12.0) / 24.0;
+        double y = y_ratio * height;
+
+        if (i == 0) cairo_move_to(cr, x, y);
+        else cairo_line_to(cr, x, y);
+    }
+    cairo_stroke(cr);
+
+    // --- LAYER 4: Line 1 (Final Equalized Result - Solid primary system accent blue)
+    cairo_set_line_width(cr, 2.0);
+    cairo_set_source_rgb(cr, 0.0, 0.48, 1.0); // #007AFF
+    for (int i = 0; i < STEPS_COUNT; i++) {
+        double x_ratio = (double)i / (STEPS_COUNT - 1);
+        double x = x_ratio * width;
+        double y_ratio = 1.0 - (final_curve[i] + 12.0) / 24.0;
+        double y = y_ratio * height;
+
+        if (i == 0) cairo_move_to(cr, x, y);
+        else cairo_line_to(cr, x, y);
     }
     cairo_stroke(cr);
 }
@@ -262,10 +317,14 @@ static void save_linux_custom_preset(const std::string& name, const std::string&
 int main(int argc, char** argv) {
     // Initialize the static universal DSP context
     g_dsp_engine = krisha_dsp_create(48000);
+    g_target_engine = krisha_dsp_create(48000);
     if (g_dsp_engine) {
         krisha_preset_t preset;
         krisha_dsp_preset_init_flat(&preset);
         krisha_dsp_apply_preset(g_dsp_engine, &preset);
+        if (g_target_engine) {
+            krisha_dsp_apply_preset(g_target_engine, &preset);
+        }
     }
 
     precompute_logarithmic_steps();
@@ -277,6 +336,9 @@ int main(int argc, char** argv) {
 
     if (g_dsp_engine) {
         krisha_dsp_destroy(g_dsp_engine);
+    }
+    if (g_target_engine) {
+        krisha_dsp_destroy(g_target_engine);
     }
     return status;
 }
