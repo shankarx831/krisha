@@ -318,6 +318,9 @@ public:
         , current_channels_(DEFAULT_CHANNELS)
         , resampler_(std::make_unique<SimpleResampler>(
             DEFAULT_SAMPLE_RATE, DEFAULT_SAMPLE_RATE, DEFAULT_CHANNELS))
+        , last_rt_host_hb_(0)
+        , last_rt_host_hb_time_(std::chrono::steady_clock::now())
+        , host_dead_(false)
     {
         std::string safe_uid = deviceUID;
         for (char& c : safe_uid) {
@@ -380,6 +383,12 @@ public:
                         }
 
                         last_heartbeat_ = std::chrono::steady_clock::now();
+                        
+                        // Reset realtime thread watchdog state
+                        last_rt_host_hb_ = 0;
+                        last_rt_host_hb_time_ = std::chrono::steady_clock::now();
+                        host_dead_ = false;
+
                         return kAudioHardwareNoError;
                     } else {
                         RF_LOG_ERROR("✗ Validation failed");
@@ -435,6 +444,26 @@ public:
         stats_.total_writes++;
 
         if (!shared_memory_) {
+            stats_.failed_writes++;
+            return;
+        }
+
+        // Lock-free Host Heartbeat Timeout / Watchdog Check
+        uint64_t current_hb = atomic_load_explicit(&shared_memory_->host_heartbeat, memory_order_relaxed);
+        auto now = std::chrono::steady_clock::now();
+        
+        if (current_hb != last_rt_host_hb_) {
+            last_rt_host_hb_ = current_hb;
+            last_rt_host_hb_time_ = now;
+            host_dead_ = false;
+        } else {
+            auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_rt_host_hb_time_).count();
+            if (elapsed_ms > 100) { // 100ms safety window
+                host_dead_ = true;
+            }
+        }
+
+        if (host_dead_) {
             stats_.failed_writes++;
             return;
         }
@@ -541,9 +570,12 @@ public:
         (void)stream;
         (void)zeroTimestamp;
         (void)timestamp;
-        (void)frames;
-        (void)frameCount;
-        (void)channelCount;
+
+        if (host_dead_) {
+            if (frames && frameCount > 0 && channelCount > 0) {
+                std::memset(frames, 0, frameCount * channelCount * sizeof(Float32));
+            }
+        }
     }
 
 private:
@@ -907,6 +939,11 @@ private:
     double last_output_timestamp_end_{0.0};
 
     AudioStats stats_;
+
+    // Realtime thread watchdog state
+    uint64_t last_rt_host_hb_{0};
+    std::chrono::steady_clock::time_point last_rt_host_hb_time_{std::chrono::steady_clock::now()};
+    bool host_dead_{false};
 };
 
 // Global state
