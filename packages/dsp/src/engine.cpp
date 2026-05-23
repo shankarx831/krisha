@@ -666,6 +666,17 @@ float krisha_dsp_get_magnitude_at_frequency(
     return total_gain_db;
 }
 
+float krisha_dsp_get_harman_target_at_frequency(
+    float frequency_hz
+) {
+    float f = frequency_hz;
+    float bass = 5.0f / (1.0f + std::pow(f / 70.0f, 2.0f));
+    float mids = 8.0f * std::exp(-std::pow(std::log10(f / 3000.0f) / 0.3f, 2.0f));
+    float treble_peak = 2.0f * std::exp(-std::pow(std::log10(f / 6000.0f) / 0.1f, 2.0f));
+    float treble = -3.0f * std::log10(std::max(1.0f, f / 8000.0f));
+    return bass + mids + treble_peak + treble;
+}
+
 // ============================================================================
 // Performance Optimizations
 // ============================================================================

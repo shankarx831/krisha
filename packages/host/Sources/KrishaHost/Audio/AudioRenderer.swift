@@ -10,9 +10,12 @@ class AudioRenderer {
     private var didLogRenderInfo = false
     private var debugRenderCount: Int = 0
     private var testTonePhase: Float = 0
-    private var tempBuffer: [Float] = []
     private let useTestTone: Bool
     private let bypassDSP: Bool
+
+    // Pre-allocated raw pointer buffer to completely eliminate ARC and heap allocations in IOPROC
+    private let tempBuffer: UnsafeMutablePointer<Float>
+    private let tempBufferCapacity = 16384
 
     init(
         memoryManager: SharedMemoryManager,
@@ -24,6 +27,14 @@ class AudioRenderer {
         self.proxyManager = proxyManager
         self.useTestTone = (ProcessInfo.processInfo.environment["RF_TEST_TONE"] == "1")
         self.bypassDSP = (ProcessInfo.processInfo.environment["RF_BYPASS_DSP"] == "1")
+
+        // Pre-allocate raw float array
+        self.tempBuffer = UnsafeMutablePointer<Float>.allocate(capacity: tempBufferCapacity)
+        self.tempBuffer.initialize(repeating: 0.0, count: tempBufferCapacity)
+    }
+
+    deinit {
+        tempBuffer.deallocate()
     }
 
     func createRenderCallback() -> AURenderCallback {
@@ -72,13 +83,15 @@ class AudioRenderer {
         }
 
         let needed = Int(frameCount) * 2
-        if tempBuffer.count < needed {
-            tempBuffer = [Float](repeating: 0, count: needed)
-        } else {
-            for i in 0..<needed {
-                tempBuffer[i] = 0
-            }
+        if needed > tempBufferCapacity {
+            // Safety fallback, should practically never happen since 16384 is massive.
+            outputSilence(bufferList: bufferList, frameCount: frameCount)
+            return;
         }
+
+        // Clear only the active segment we are about to read into
+        tempBuffer.initialize(repeating: 0.0, count: needed)
+
         let framesRead: UInt32
 
         if useTestTone {
@@ -96,7 +109,7 @@ class AudioRenderer {
             }
             framesRead = frameCount
         } else {
-            framesRead = rf_ring_read(mem, &tempBuffer, frameCount)
+            framesRead = rf_ring_read(mem, tempBuffer, frameCount)
         }
 
         if debugRenderCount < 5 {
@@ -115,7 +128,7 @@ class AudioRenderer {
         }
 
         if !bypassDSP {
-            dspProcessor.processInterleaved(tempBuffer, output: &tempBuffer, frameCount: framesRead)
+            dspProcessor.processInterleavedRaw(tempBuffer, output: tempBuffer, frameCount: framesRead)
         }
 
         deinterleave(
@@ -137,7 +150,7 @@ class AudioRenderer {
     }
 
     private func deinterleave(
-        source: [Float],
+        source: UnsafePointer<Float>,
         bufferList: UnsafeMutablePointer<AudioBufferList>,
         framesRead: UInt32,
         totalFrames: UInt32

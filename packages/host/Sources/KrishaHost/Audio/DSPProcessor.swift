@@ -33,6 +33,15 @@ class DSPProcessor {
         krisha_dsp_process_interleaved(engine, input, &output, frameCount)
     }
 
+    func processInterleavedRaw(
+        _ input: UnsafePointer<Float>,
+        output: UnsafeMutablePointer<Float>,
+        frameCount: UInt32
+    ) {
+        guard let engine = engine else { return }
+        krisha_dsp_process_interleaved(engine, input, output, frameCount)
+    }
+
     func setSampleRate(_ sampleRate: UInt32) -> Bool {
         guard let engine = engine else { return false }
         return krisha_dsp_set_sample_rate(engine, sampleRate) == KRISHA_OK

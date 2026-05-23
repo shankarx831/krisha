@@ -4,7 +4,14 @@ import AppKit
 struct TenBandEQ: View {
     @ObservedObject private var presetManager = PresetManager.shared
 
-    let displayOrder = [10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    // Dynamically sort the active EQ band indices by frequency so they appear in perfect ascending order (bass to treble)
+    var displayOrder: [Int] {
+        let bandIndices = Array(0..<10)
+        let sortedBandIndices = bandIndices.sorted { idx1, idx2 in
+            presetManager.currentFrequencies[idx1] < presetManager.currentFrequencies[idx2]
+        }
+        return [10, 11] + sortedBandIndices
+    }
 
     /// Format frequency value for band labels
     private func formatFrequency(_ hz: Float) -> String {
@@ -20,16 +27,16 @@ struct TenBandEQ: View {
     var body: some View {
         VStack(spacing: 8) {
             // Grid of vertical sliders with background grid lines
-            ZStack {
-                // Horizontal grid lines
+            ZStack(alignment: .top) {
+                // Horizontal grid lines - aligned perfectly with slider track bounds [10, 90]
                 GeometryReader { geometry in
-                    let sliderHeight: CGFloat = 100
-                    let topPadding: CGFloat = 0
+                    let trackHeight: CGFloat = 80
+                    let trackPadding: CGFloat = 10
 
                     // Draw grid lines every 3 dB (-12 to +12 = 9 lines)
                     ForEach(0..<9, id: \.self) { index in
                         let dbValue = 12 - (Float(index) * 3)
-                        let yPosition = topPadding + (sliderHeight * CGFloat(index) / 8.0)
+                        let yPosition = trackPadding + (trackHeight * CGFloat(index) / 8.0)
                         let isCenterLine = (dbValue == 0)
 
                         Rectangle()
@@ -76,17 +83,17 @@ struct TenBandEQ: View {
                             // Frequency label
                             Text(index == 10 ? "Pre L" : (index == 11 ? "Pre R" : formatFrequency(presetManager.currentFrequencies[index])))
                             .font(.system(size: 9))
-                            .foregroundColor(index >= 10 ? .accentColor.opacity(0.7) : .secondary)
-                            .frame(minWidth: 22)
+                            .foregroundColor(index >= 10 ? Color.blue.opacity(0.8) : Color.white.opacity(0.6))
+                            .frame(minWidth: 18)
                         }
-                        .padding(.horizontal, 3)
+                        .padding(.horizontal, 1.5)
 
                         if index == 11 {
                             // Subtle separator after preamp knobs
                             Rectangle()
                                 .fill(Color(NSColor.separatorColor).opacity(0.3))
                                 .frame(width: 1, height: 80)
-                                .padding(.horizontal, 4)
+                                .padding(.horizontal, 2)
                         }
                     }
                 }
@@ -122,6 +129,10 @@ struct VerticalSlider: View {
     private let normalKnobSize: CGFloat = 16
     private let focusedKnobSize: CGFloat = 22
 
+    // Bounds for the slider's physical track inside the height 100 view
+    private let trackPadding: CGFloat = 10
+    private let trackHeight: CGFloat = 80
+
     // While dragging, if the user moves the cursor horizontally beyond this threshold, the dB levels will be adjusted more precisely
     private let preciseThresholdX: Float = 50
     // Exit precise mode below this threshold (hysteresis prevents flickering near boundary)
@@ -151,75 +162,57 @@ struct VerticalSlider: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
-                // Track background
+                // Track background - constrained exactly to track bounds
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color(NSColor.separatorColor))
-                    .frame(width: 4)
+                    .frame(width: 4, height: trackHeight)
+                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
 
-                // Center line (0 dB)
-                let centerY = geometry.size.height / 2
+                // Center line (0 dB) - positioned exactly at centerY
+                let centerY = trackPadding + trackHeight / 2 // 50
                 Rectangle()
                     .fill(Color(NSColor.tertiaryLabelColor))
-                    .frame(width: 20, height: 1)
+                    .frame(width: 16, height: 1)
                     .position(x: geometry.size.width / 2, y: centerY)
 
-                // Filled portion (from center to knob)
-                let normalizedValue = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
-                let knobY = geometry.size.height * (1 - CGFloat(normalizedValue))
+                // Filled portion (from center to knob) - perfectly aligned
+                let clampedValue = min(max(range.lowerBound, value), range.upperBound)
+                let normalizedValue = CGFloat((clampedValue - range.lowerBound) / (range.upperBound - range.lowerBound))
+                let knobY = trackPadding + trackHeight * (1 - normalizedValue)
 
                 if value != 0 {
                     let fillHeight = abs(knobY - centerY)
                     let fillY = min(knobY, centerY)
 
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.accentColor)
+                        .fill(Color.blue)
                         .frame(width: 4, height: fillHeight)
                         .position(x: geometry.size.width / 2, y: fillY + fillHeight / 2)
                 }
 
-                // Knob
+                // Knob - perfectly centered on knobY, no focus jump because knobY doesn't depend on knobSize
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(NSColor.controlBackgroundColor),
-                                    Color(NSColor.controlBackgroundColor).opacity(0.9)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
+                        .fill(Color(white: 0.15))
                         .overlay(
                             Circle()
                                 .stroke(
-                                    (isFocused
-                                        ? isDragging
-                                            ? Color.white
-                                            : Color.accentColor.opacity(0.6)
-                                        : Color(NSColor.separatorColor).opacity(0.8)),
-                                    style: StrokeStyle(
-                                        lineWidth: isFocused ? 1 : 0.5,
-
-                                        // Dotted border indicates precise dragging mode
-                                        dash: isDragging && isPreciseDrag ? [2, 2] : []
-                                    )
+                                    isFocused ? Color.blue : Color.white.opacity(0.2),
+                                    lineWidth: isFocused ? 1.5 : 1.0
                                 )
                         )
 
                     // dB text inside focused knob
                     if isFocused {
                         Text(knobDisplayText)
-                            .font(.system(size: 7, weight: .medium, design: .rounded))
-                            .foregroundColor(.primary.opacity(0.8))
+                            .font(.system(size: 7, weight: .bold, design: .default))
+                            .foregroundColor(.white.opacity(0.9))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
-                            // Reduce horizontal text movement when dragging
                             .monospacedDigit()
                     }
                 }
                 .frame(width: knobSize, height: knobSize)
-                .shadow(color: .black.opacity(0.15), radius: 1.5, x: 0, y: 0.5)
                 .position(
                     x: geometry.size.width / 2,
                     y: knobY
@@ -243,7 +236,7 @@ struct VerticalSlider: View {
                             let multiplier: Float = isPreciseDrag ? preciseFactor : 1
 
                             let deltaY = Float(gesture.translation.height - (prevDragY ?? gesture.translation.height))
-                            let progress = -deltaY / Float(geometry.size.height)
+                            let progress = -deltaY / Float(trackHeight) // Map directly to track bounds
                             let valueIncrement = progress * rangeSpan * multiplier
                             value = min(max(range.lowerBound, value + valueIncrement), range.upperBound)
 

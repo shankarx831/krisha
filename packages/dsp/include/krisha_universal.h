@@ -89,6 +89,19 @@ krisha_error_t krisha_preset_parse_autoeq(
     krisha_preset_t* preset
 );
 
+/**
+ * @brief Get the Harman Target Curve baseline magnitude in dB at a specific frequency
+ *
+ * Calculates the static, precalculated mathematical model approximating the
+ * industry-standard Harman Target Curve as a visual reference line.
+ *
+ * @param frequency_hz Frequency in Hz
+ * @return Calculated baseline target gain in decibels (dB)
+ */
+float krisha_dsp_get_harman_target_at_frequency(
+    float frequency_hz
+);
+
 #ifdef __cplusplus
 }
 #endif

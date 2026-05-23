@@ -6,9 +6,12 @@
     <Application.Resources>
         <!-- Modern sleek system tray application styling resources -->
         <ResourceDictionary>
-            <SolidColorBrush x:Key="NeonCyan" Color="#00E5E5"/>
-            <SolidColorBrush x:Key="NeonMagenta" Color="#FF0099"/>
-            <SolidColorBrush x:Key="GlassBg" Color="#1F1F1F"/>
+            <SolidColorBrush x:Key="WindowBgBrush" Color="#121212"/>
+            <SolidColorBrush x:Key="SurfaceBrush" Color="#1C1C1E"/>
+            <SolidColorBrush x:Key="AccentBlueBrush" Color="#007AFF"/>
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#8E8E93"/>
+            <SolidColorBrush x:Key="BorderBrush" Color="#2C2C2E"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

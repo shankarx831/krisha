@@ -25,6 +25,9 @@ namespace KrishaSpoke.Windows
         [DllImport(DllName, EntryPoint = "krisha_dsp_get_magnitude_at_frequency", CallingConvention = CallingConvention.Cdecl)]
         private static extern float KrishaDspGetMagnitudeAtFrequency(IntPtr engine, float frequencyHz, bool leftChannel);
 
+        [DllImport(DllName, EntryPoint = "krisha_dsp_get_harman_target_at_frequency", CallingConvention = CallingConvention.Cdecl)]
+        private static extern float KrishaDspGetHarmanTargetAtFrequency(float frequencyHz);
+
         // ============================================================================
         // Fields & Properties
         // ============================================================================
@@ -36,6 +39,7 @@ namespace KrishaSpoke.Windows
 
         public float[] LeftMagnitudes { get; private set; }
         public float[] RightMagnitudes { get; private set; }
+        public float[] HarmanTargetMagnitudes { get; private set; }
 
         public EQGraph(uint sampleRate = 48000)
         {
@@ -48,6 +52,7 @@ namespace KrishaSpoke.Windows
             _logFrequencies = new float[StepsCount];
             LeftMagnitudes = new float[StepsCount];
             RightMagnitudes = new float[StepsCount];
+            HarmanTargetMagnitudes = new float[StepsCount];
 
             PrecomputeLogarithmicSteps();
         }
@@ -92,17 +97,20 @@ namespace KrishaSpoke.Windows
 
                     float[] leftTemp = new float[StepsCount];
                     float[] rightTemp = new float[StepsCount];
+                    float[] harmanTemp = new float[StepsCount];
 
                     for (int i = 0; i < StepsCount; i++)
                     {
                         float freq = _logFrequencies[i];
                         leftTemp[i] = KrishaDspGetMagnitudeAtFrequency(_tempEngine, freq, true);
                         rightTemp[i] = KrishaDspGetMagnitudeAtFrequency(_tempEngine, freq, false);
+                        harmanTemp[i] = KrishaDspGetHarmanTargetAtFrequency(freq);
                     }
 
                     // Atomic swap to avoid UI thread race conditions
                     LeftMagnitudes = leftTemp;
                     RightMagnitudes = rightTemp;
+                    HarmanTargetMagnitudes = harmanTemp;
                 }
             });
         }

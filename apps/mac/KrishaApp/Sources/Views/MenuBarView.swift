@@ -1,21 +1,7 @@
 import SwiftUI
 
 // Cache font lookup once at launch
-private let krishaFont: Font = {
-    let size: CGFloat = 22
-    let possibleNames = [
-        "SignPainterHouseScript",
-        "SignPainter-HouseScript",
-        "SignPainter House Script",
-        "SignPainter"
-    ]
-    for name in possibleNames {
-        if NSFont(name: name, size: size) != nil {
-            return .custom(name, size: size)
-        }
-    }
-    return .system(size: size, weight: .bold)
-}()
+private let krishaFont: Font = .system(size: 20, weight: .semibold)
 
 struct MenuBarView: View {
     @ObservedObject private var presetManager = PresetManager.shared
@@ -79,12 +65,12 @@ struct MenuBarView: View {
                     // Live EQ Graph View
                     LiveEQGraph(presetManager: presetManager)
                         .padding(.horizontal, 12)
-                        .padding(.bottom, 6)
+                        .padding(.bottom, 12)
 
                     // 10-Band EQ + Preamp
                     TenBandEQ()
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 8)
 
                     // Contextual area: band controls (focused) or presets (default)
                     if let focusedIndex = presetManager.focusedBandIndex {
@@ -137,7 +123,7 @@ struct MenuBarView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
         }
-        .frame(width: 340)
+        .frame(width: 380)
         .fixedSize(horizontal: false, vertical: true)
         .transaction { $0.animation = nil }
     }
@@ -214,7 +200,7 @@ struct PresetDropdown: View {
     
     /// Circle color: blue for saved preset, gray otherwise
     private var circleColor: Color {
-        hasSelectedPreset ? Color.accentColor : Color(NSColor.separatorColor).opacity(0.5)
+        hasSelectedPreset ? Color.blue : Color(white: 0.15)
     }
     
     var body: some View {
@@ -314,7 +300,7 @@ struct PresetDropdown: View {
                         .padding(.vertical, 6)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(isValidPresetName ? Color.accentColor : Color(NSColor.separatorColor).opacity(0.5))
+                                .fill(isValidPresetName ? Color.blue : Color(white: 0.15))
                         )
                 }
                 .buttonStyle(.plain)
@@ -445,7 +431,7 @@ struct MenuItemButton: View {
                 Circle()
                     .fill(
                         isActive
-                            ? Color.accentColor : Color(NSColor.separatorColor).opacity(0.4)
+                            ? Color.blue : Color(white: 0.15)
                     )
                     .frame(width: 28, height: 28)
 
@@ -581,7 +567,7 @@ struct BandControls: View {
                                 .padding(.vertical, 3)
                                 .background(
                                     RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                        .fill(isSelected ? Color.accentColor : Color(NSColor.separatorColor).opacity(0.25))
+                                        .fill(isSelected ? Color.blue : Color(white: 0.15))
                                 )
                         }
                         .buttonStyle(.plain)
@@ -740,7 +726,7 @@ struct QuitButton: View {
                 .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(isHovered ? Color.accentColor : Color.clear)
+                        .fill(isHovered ? Color.blue : Color.white.opacity(0.05))
                 )
         }
         .buttonStyle(.plain)

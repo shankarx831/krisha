@@ -237,20 +237,25 @@ static inline uint32_t rf_ring_write(
     const float* input_frames,  // Always float32 input
     uint32_t num_frames)
 {
-    uint64_t write_idx = atomic_load(&mem->write_index);
-    uint64_t read_idx = atomic_load(&mem->read_index);
+    uint64_t write_idx = atomic_load_explicit(&mem->write_index, memory_order_relaxed);
+    uint64_t read_idx = atomic_load_explicit(&mem->read_index, memory_order_acquire);
     uint32_t capacity = mem->ring_capacity_frames;
 
-    // Check for overflow - advance read_index to keep producer timeline intact
+    // Check for overflow safely - writer must NEVER modify read_index.
+    // If full, only write what fits, and drop/overrun the rest.
     uint64_t used = write_idx - read_idx;
+    uint32_t frames_to_write = num_frames;
     if (used + num_frames > capacity) {
-        uint32_t frames_to_drop = (uint32_t)((used + num_frames) - capacity);
-        atomic_store(&mem->read_index, read_idx + frames_to_drop);
-        atomic_fetch_add(&mem->overrun_count, 1);
+        frames_to_write = (capacity > used) ? (capacity - (uint32_t)used) : 0;
+        atomic_fetch_add_explicit(&mem->overrun_count, 1, memory_order_relaxed);
+    }
+
+    if (frames_to_write == 0) {
+        return 0;
     }
 
     // Write with format conversion
-    for (uint32_t frame = 0; frame < num_frames; frame++) {
+    for (uint32_t frame = 0; frame < frames_to_write; frame++) {
         uint32_t ring_pos = (uint32_t)((write_idx + frame) % capacity);
         uint8_t* dest = &mem->audio_data[ring_pos * mem->bytes_per_frame];
 
@@ -298,10 +303,10 @@ static inline uint32_t rf_ring_write(
         }
     }
 
-    atomic_store(&mem->write_index, write_idx + num_frames);
-    atomic_fetch_add(&mem->total_frames_written, num_frames);
+    atomic_store_explicit(&mem->write_index, write_idx + frames_to_write, memory_order_release);
+    atomic_fetch_add_explicit(&mem->total_frames_written, frames_to_write, memory_order_relaxed);
 
-    return num_frames;
+    return frames_to_write;
 }
 
 /**
@@ -314,8 +319,8 @@ static inline uint32_t rf_ring_read(
     float* output_frames,  // Always float32 output
     uint32_t num_frames)
 {
-    uint64_t write_idx = atomic_load(&mem->write_index);
-    uint64_t read_idx = atomic_load(&mem->read_index);
+    uint64_t write_idx = atomic_load_explicit(&mem->write_index, memory_order_acquire);
+    uint64_t read_idx = atomic_load_explicit(&mem->read_index, memory_order_relaxed);
     uint32_t capacity = mem->ring_capacity_frames;
     uint32_t available = (uint32_t)(write_idx - read_idx);
 
@@ -368,7 +373,7 @@ static inline uint32_t rf_ring_read(
 
     // Fill remaining with silence if underrun
     if (frames_to_read < num_frames) {
-        atomic_fetch_add(&mem->underrun_count, 1);
+        atomic_fetch_add_explicit(&mem->underrun_count, 1, memory_order_relaxed);
         for (uint32_t frame = frames_to_read; frame < num_frames; frame++) {
             for (uint32_t ch = 0; ch < mem->channels; ch++) {
                 output_frames[frame * mem->channels + ch] = 0.0f;
@@ -376,23 +381,23 @@ static inline uint32_t rf_ring_read(
         }
     }
 
-    atomic_store(&mem->read_index, read_idx + frames_to_read);
-    atomic_fetch_add(&mem->total_frames_read, frames_to_read);
+    atomic_store_explicit(&mem->read_index, read_idx + frames_to_read, memory_order_release);
+    atomic_fetch_add_explicit(&mem->total_frames_read, frames_to_read, memory_order_relaxed);
 
-    return num_frames;
+    return frames_to_read;
 }
 
 /**
  * Update heartbeat (call every ~1 second)
  */
 static inline void rf_update_driver_heartbeat(RFSharedAudio* mem) {
-    atomic_fetch_add(&mem->driver_heartbeat, 1);
-    atomic_store(&mem->driver_connected, 1);
+    atomic_fetch_add_explicit(&mem->driver_heartbeat, 1, memory_order_relaxed);
+    atomic_store_explicit(&mem->driver_connected, 1, memory_order_relaxed);
 }
 
 static inline void rf_update_host_heartbeat(RFSharedAudio* mem) {
-    atomic_fetch_add(&mem->host_heartbeat, 1);
-    atomic_store(&mem->host_connected, 1);
+    atomic_fetch_add_explicit(&mem->host_heartbeat, 1, memory_order_relaxed);
+    atomic_store_explicit(&mem->host_connected, 1, memory_order_relaxed);
 }
 
 /**

@@ -3,8 +3,8 @@ import Combine
 import CKrishaDSP
 
 class LiveEQGraphViewModel: ObservableObject {
-    @Published var leftPathPoints: [CGPoint] = []
-    @Published var rightPathPoints: [CGPoint] = []
+    @Published var activePathPoints: [CGPoint] = []
+    @Published var harmanPathPoints: [CGPoint] = []
     
     private var cancellables = Set<AnyCancellable>()
     private let calculationQueue = DispatchQueue(label: "com.krisha.eq-graph-calc", qos: .userInteractive)
@@ -93,32 +93,35 @@ class LiveEQGraphViewModel: ObservableObject {
             let applyResult = krisha_dsp_apply_preset(offlineEngine, &preset)
             guard applyResult == KRISHA_OK else { return }
             
-            var leftPoints: [CGPoint] = []
-            var rightPoints: [CGPoint] = []
+            var activePoints: [CGPoint] = []
+            var harmanPoints: [CGPoint] = []
             
             for i in 0..<120 {
                 let freq = testFrequencies[i]
-                let leftDb = krisha_dsp_get_magnitude_at_frequency(offlineEngine, freq, true)
-                let rightDb = krisha_dsp_get_magnitude_at_frequency(offlineEngine, freq, false)
+                
+                // Vector A: Active signature (Left channel magnitude response)
+                let activeDb = krisha_dsp_get_magnitude_at_frequency(offlineEngine, freq, true)
+                // Vector B: Harman reference baseline magnitude
+                let harmanDb = krisha_dsp_get_harman_target_at_frequency(freq)
                 
                 // x is standardized in [0, 1] range representing log frequency
                 let x = CGFloat(i) / 119.0
                 
                 // Cap DB between -12dB and +12dB
-                let capLeftDb = max(-12.0, min(12.0, leftDb))
-                let capRightDb = max(-12.0, min(12.0, rightDb))
+                let capActiveDb = max(-12.0, min(12.0, activeDb))
+                let capHarmanDb = max(-12.0, min(12.0, harmanDb))
                 
                 // y is standardized in [0, 1] range where 0 is +12dB and 1 is -12dB
-                let yLeft = CGFloat((12.0 - capLeftDb) / 24.0)
-                let yRight = CGFloat((12.0 - capRightDb) / 24.0)
+                let yActive = CGFloat((12.0 - capActiveDb) / 24.0)
+                let yHarman = CGFloat((12.0 - capHarmanDb) / 24.0)
                 
-                leftPoints.append(CGPoint(x: x, y: yLeft))
-                rightPoints.append(CGPoint(x: x, y: yRight))
+                activePoints.append(CGPoint(x: x, y: yActive))
+                harmanPoints.append(CGPoint(x: x, y: yHarman))
             }
             
             DispatchQueue.main.async {
-                self.leftPathPoints = leftPoints
-                self.rightPathPoints = rightPoints
+                self.activePathPoints = activePoints
+                self.harmanPathPoints = harmanPoints
             }
         }
     }
@@ -137,34 +140,19 @@ struct LiveEQGraph: View {
     
     var body: some View {
         VStack(spacing: 4) {
+            // Draw coordinate chart
             GeometryReader { geo in
                 ZStack {
-                    // Sleek grid background
+                    // Minimal grid background
                     gridBackground(size: geo.size)
                     
-                    // Left Response Curve (Neon Cyan)
-                    curvePath(points: viewModel.leftPathPoints, size: geo.size)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color(red: 0.0, green: 0.9, blue: 0.9), Color(red: 0.0, green: 0.5, blue: 0.9)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            lineWidth: 2
-                        )
-                        .shadow(color: Color(red: 0.0, green: 0.8, blue: 0.8).opacity(0.4), radius: 3)
+                    // Line B: Harman Reference Baseline (Muted Fine Dashed Translucent Gray/White)
+                    curvePath(points: viewModel.harmanPathPoints, size: geo.size)
+                        .stroke(Color.white.opacity(0.15), style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
                     
-                    // Right Response Curve (Neon Magenta)
-                    curvePath(points: viewModel.rightPathPoints, size: geo.size)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color(red: 1.0, green: 0.0, blue: 0.6), Color(red: 0.8, green: 0.0, blue: 0.9)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            lineWidth: 2
-                        )
-                        .shadow(color: Color(red: 0.9, green: 0.0, blue: 0.7).opacity(0.4), radius: 3)
+                    // Line A: Active Sound Signature ( Crisp System Blue Accent)
+                    curvePath(points: viewModel.activePathPoints, size: geo.size)
+                        .stroke(Color.blue, lineWidth: 1.5)
                     
                     // Hover Tooltip Marker & Text Overlay
                     if let location = hoverLocation {
@@ -172,11 +160,11 @@ struct LiveEQGraph: View {
                     }
                 }
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.black.opacity(0.45))
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(white: 0.05))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
                         )
                 )
                 .contentShape(Rectangle())
@@ -199,15 +187,15 @@ struct LiveEQGraph: View {
             
             // X-axis Legend labels (Frequency steps)
             HStack {
-                Text("20Hz").font(.system(size: 9, weight: .semibold)).foregroundColor(.white.opacity(0.4))
+                Text("20Hz").font(.system(size: 9, weight: .regular)).foregroundColor(.white.opacity(0.4))
                 Spacer()
-                Text("100Hz").font(.system(size: 9, weight: .semibold)).foregroundColor(.white.opacity(0.4))
+                Text("100Hz").font(.system(size: 9, weight: .regular)).foregroundColor(.white.opacity(0.4))
                 Spacer()
-                Text("1kHz").font(.system(size: 9, weight: .semibold)).foregroundColor(.white.opacity(0.4))
+                Text("1kHz").font(.system(size: 9, weight: .regular)).foregroundColor(.white.opacity(0.4))
                 Spacer()
-                Text("10kHz").font(.system(size: 9, weight: .semibold)).foregroundColor(.white.opacity(0.4))
+                Text("10kHz").font(.system(size: 9, weight: .regular)).foregroundColor(.white.opacity(0.4))
                 Spacer()
-                Text("20kHz").font(.system(size: 9, weight: .semibold)).foregroundColor(.white.opacity(0.4))
+                Text("20kHz").font(.system(size: 9, weight: .regular)).foregroundColor(.white.opacity(0.4))
             }
             .padding(.horizontal, 4)
         }
@@ -234,25 +222,23 @@ struct LiveEQGraph: View {
     private func gridBackground(size: CGSize) -> some View {
         ZStack {
             // Horizontal lines (dB Steps: +12, +6, 0, -6, -12)
-            VStack {
-                ForEach([12, 6, 0, -6, -12], id: \.self) { db in
-                    if db != 12 && db != -12 {
-                        let yRatio = CGFloat((12.0 - Double(db)) / 24.0)
-                        Path { path in
-                            path.move(to: CGPoint(x: 0, y: yRatio * size.height))
-                            path.addLine(to: CGPoint(x: size.width, y: yRatio * size.height))
-                        }
-                        .stroke(db == 0 ? Color.white.opacity(0.25) : Color.white.opacity(0.08),
-                                style: StrokeStyle(lineWidth: 1, dash: db == 0 ? [] : [2, 3]))
-                        .overlay(
-                            Text("\(db > 0 ? "+" : "")\(db)dB")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(.white.opacity(0.3))
-                                .position(x: 20, y: yRatio * size.height - 6),
-                            alignment: .topLeading
-                        )
-                    }
+            ForEach([6, 0, -6], id: \.self) { db in
+                let yRatio = CGFloat((12.0 - Double(db)) / 24.0)
+                let yVal = yRatio * size.height
+                
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: yVal))
+                    path.addLine(to: CGPoint(x: size.width, y: yVal))
                 }
+                .stroke(db == 0 ? Color.white.opacity(0.2) : Color.white.opacity(0.05),
+                        style: StrokeStyle(lineWidth: 1, dash: db == 0 ? [] : [2, 3]))
+                .overlay(
+                    Text("\(db > 0 ? "+" : "")\(db)dB")
+                        .font(.system(size: 8, weight: .regular))
+                        .foregroundColor(.white.opacity(0.3))
+                        .position(x: 25, y: yVal - 6),
+                    alignment: .topLeading
+                )
             }
             
             // Vertical log lines (Freq steps)
@@ -266,7 +252,7 @@ struct LiveEQGraph: View {
                     path.move(to: CGPoint(x: ratio * size.width, y: 0))
                     path.addLine(to: CGPoint(x: ratio * size.width, y: size.height))
                 }
-                .stroke(Color.white.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                .stroke(Color.white.opacity(0.04), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
             }
         }
     }
@@ -285,8 +271,8 @@ struct LiveEQGraph: View {
         // Find nearest point index in viewModel
         let index = min(119, max(0, Int(xRatio * 119)))
         
-        let leftDb = viewModel.leftPathPoints.indices.contains(index) ? 12.0 - Double(viewModel.leftPathPoints[index].y * 24.0) : 0.0
-        let rightDb = viewModel.rightPathPoints.indices.contains(index) ? 12.0 - Double(viewModel.rightPathPoints[index].y * 24.0) : 0.0
+        let activeDb = viewModel.activePathPoints.indices.contains(index) ? 12.0 - Double(viewModel.activePathPoints[index].y * 24.0) : 0.0
+        let harmanDb = viewModel.harmanPathPoints.indices.contains(index) ? 12.0 - Double(viewModel.harmanPathPoints[index].y * 24.0) : 0.0
         
         ZStack {
             // vertical guide line
@@ -294,49 +280,49 @@ struct LiveEQGraph: View {
                 path.move(to: CGPoint(x: location.x, y: 0))
                 path.addLine(to: CGPoint(x: location.x, y: size.height))
             }
-            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+            .stroke(Color.white.opacity(0.15), lineWidth: 1)
             
-            // Neon Cyan dot for Left channel
-            if viewModel.leftPathPoints.indices.contains(index) {
+            // Dot for Harman reference
+            if viewModel.harmanPathPoints.indices.contains(index) {
                 Circle()
-                    .fill(Color(red: 0.0, green: 0.9, blue: 0.9))
-                    .frame(width: 6, height: 6)
-                    .position(x: location.x, y: viewModel.leftPathPoints[index].y * size.height)
+                    .fill(Color.white.opacity(0.4))
+                    .frame(width: 5, height: 5)
+                    .position(x: location.x, y: viewModel.harmanPathPoints[index].y * size.height)
             }
             
-            // Neon Magenta dot for Right channel
-            if viewModel.rightPathPoints.indices.contains(index) {
+            // Dot for Active sound signature
+            if viewModel.activePathPoints.indices.contains(index) {
                 Circle()
-                    .fill(Color(red: 1.0, green: 0.0, blue: 0.6))
-                    .frame(width: 6, height: 6)
-                    .position(x: location.x, y: viewModel.rightPathPoints[index].y * size.height)
+                    .fill(Color.blue)
+                    .frame(width: 5, height: 5)
+                    .position(x: location.x, y: viewModel.activePathPoints[index].y * size.height)
             }
             
-            // HUD panel displaying exact statistics
+            // HUD panel displaying exact statistics comparing both
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(Int(freq)) Hz")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.white)
                 
                 HStack(spacing: 6) {
-                    Circle().fill(Color(red: 0.0, green: 0.8, blue: 0.8)).frame(width: 4, height: 4)
-                    Text("L: \(String(format: "%.1f", leftDb)) dB")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(Color(red: 0.0, green: 0.85, blue: 0.85))
+                    Circle().fill(Color.blue).frame(width: 4, height: 4)
+                    Text("Active: \(String(format: "%.1f", activeDb)) dB")
+                        .font(.system(size: 9, weight: .regular))
+                        .foregroundColor(Color.blue)
                 }
                 
                 HStack(spacing: 6) {
-                    Circle().fill(Color(red: 0.9, green: 0.0, blue: 0.6)).frame(width: 4, height: 4)
-                    Text("R: \(String(format: "%.1f", rightDb)) dB")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(Color(red: 0.95, green: 0.0, blue: 0.65))
+                    Circle().fill(Color.white.opacity(0.5)).frame(width: 4, height: 4)
+                    Text("Harman: \(String(format: "%.1f", harmanDb)) dB")
+                        .font(.system(size: 9, weight: .regular))
+                        .foregroundColor(.white.opacity(0.7))
                 }
             }
             .padding(6)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.black.opacity(0.85))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                    .fill(Color(white: 0.05).opacity(0.95))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
             )
             .position(x: location.x + (location.x > size.width * 0.7 ? -50 : 50), y: 35)
         }

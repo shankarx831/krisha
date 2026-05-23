@@ -58,11 +58,11 @@ TEST(preset_validate_invalid_gain) {
     krisha_dsp_preset_init_flat(&preset);
 
     // Invalid gain (too negative)
-    preset.bands[0].gain_db = -15.0f; // Below -12 dB
+    preset.bands[0].gain_db = -45.0f; // Below -36 dB
     ASSERT_EQ(krisha_dsp_preset_validate(&preset), KRISHA_ERROR_INVALID_PARAM);
 
     // Invalid gain (too positive)
-    preset.bands[0].gain_db = 15.0f; // Above +12 dB
+    preset.bands[0].gain_db = 45.0f; // Above +36 dB
     ASSERT_EQ(krisha_dsp_preset_validate(&preset), KRISHA_ERROR_INVALID_PARAM);
 
     PASS();
@@ -73,11 +73,11 @@ TEST(preset_validate_invalid_q) {
     krisha_dsp_preset_init_flat(&preset);
 
     // Invalid Q (too low)
-    preset.bands[0].q_factor = 0.05f; // Below 0.1
+    preset.bands[0].q_factor = 0.005f; // Below 0.01
     ASSERT_EQ(krisha_dsp_preset_validate(&preset), KRISHA_ERROR_INVALID_PARAM);
 
     // Invalid Q (too high)
-    preset.bands[0].q_factor = 15.0f; // Above 10.0
+    preset.bands[0].q_factor = 150.0f; // Above 100.0
     ASSERT_EQ(krisha_dsp_preset_validate(&preset), KRISHA_ERROR_INVALID_PARAM);
 
     PASS();

@@ -96,13 +96,14 @@ const char* StateToString(DeviceState state) {
     }
 }
 
-// Sample rate conversion (simple linear interpolation)
+// Sample rate conversion (simple linear interpolation with seamless boundary continuation)
 class SimpleResampler {
 public:
     SimpleResampler(double from_rate, double to_rate, uint32_t channels)
         : from_rate_(from_rate), to_rate_(to_rate), channels_(channels), ratio_(1.0), position_(0.0)
     {
         SetRates(from_rate, to_rate);
+        std::fill(last_samples_, last_samples_ + RF_MAX_CHANNELS, 0.0f);
         RF_LOG_INFO("Resampler: %.2f -> %.2f Hz (ratio: %.8f)", from_rate_, to_rate_, ratio_);
     }
 
@@ -117,29 +118,40 @@ public:
 
     void SetChannels(uint32_t channels)
     {
-        channels_ = std::max<uint32_t>(1, channels);
+        channels_ = std::max<uint32_t>(1, std::min<uint32_t>(channels, RF_MAX_CHANNELS));
     }
 
-    // Resample input to output
-    // Returns number of output frames produced
+    // Resample input to output with 1-sample delay to interpolate across boundaries seamlessly
     uint32_t Process(const float* input, uint32_t input_frames,
                      float* output, uint32_t output_capacity)
     {
+        if (input_frames == 0 || output_capacity == 0) return 0;
         uint32_t output_frames = 0;
 
         while (output_frames < output_capacity && position_ < input_frames) {
-            uint32_t idx0 = (uint32_t)position_;
-            uint32_t idx1 = std::min(idx0 + 1, input_frames - 1);
-            float frac = position_ - idx0;
+            double idx_d;
+            double frac = std::modf(position_, &idx_d);
+            int32_t idx = static_cast<int32_t>(idx_d);
 
             for (uint32_t ch = 0; ch < channels_; ch++) {
-                float s0 = input[idx0 * channels_ + ch];
-                float s1 = input[idx1 * channels_ + ch];
-                output[output_frames * channels_ + ch] = s0 + frac * (s1 - s0);
+                float s0, s1;
+                if (idx == 0) {
+                    s0 = last_samples_[ch];
+                    s1 = input[0 * channels_ + ch];
+                } else {
+                    s0 = input[(idx - 1) * channels_ + ch];
+                    s1 = input[idx * channels_ + ch];
+                }
+                output[output_frames * channels_ + ch] = s0 + static_cast<float>(frac) * (s1 - s0);
             }
 
             output_frames++;
             position_ += ratio_;
+        }
+
+        // Save the last sample of this buffer for boundary continuation in the next call
+        for (uint32_t ch = 0; ch < channels_; ch++) {
+            last_samples_[ch] = input[(input_frames - 1) * channels_ + ch];
         }
 
         position_ -= input_frames;
@@ -149,7 +161,10 @@ public:
         return output_frames;
     }
 
-    void Reset() { position_ = 0.0; }
+    void Reset() {
+        position_ = 0.0;
+        std::fill(last_samples_, last_samples_ + RF_MAX_CHANNELS, 0.0f);
+    }
 
 private:
     double from_rate_;
@@ -157,6 +172,7 @@ private:
     uint32_t channels_;
     double ratio_;
     double position_;
+    float last_samples_[RF_MAX_CHANNELS];
 };
 
 // Runtime statistics.
@@ -311,6 +327,9 @@ public:
 
         RF_LOG_INFO("UniversalAudioHandler created: %s", device_uid_.c_str());
         RF_LOG_INFO("  Supports: 44.1-192kHz, 1-8ch, all formats");
+
+        // Pre-allocate conversion buffers during setup (non-realtime thread)
+        ResizeBuffers();
     }
 
     ~UniversalAudioHandler() {
@@ -343,7 +362,7 @@ public:
                         RF_LOG_INFO("✓ Connected on attempt %d", attempt);
                         state_ = DeviceState::Connected;
 
-                        // Pre-allocate conversion buffers
+                        // Pre-allocate/Resize buffers with shared memory info
                         ResizeBuffers();
 
                         // Prebuffer half a ring of silence so the host render callback always has
@@ -448,14 +467,14 @@ public:
             HandleFormatChange(fmt);
         }
 
-        // Ensure pre-allocated buffer is large enough
-        size_t needed = frameCount * fmt.mChannelsPerFrame;
-        if (interleaved_buf_.size() < needed) {
-            interleaved_buf_.resize(needed);
+        // Clamp frameCount to avoid overflow of pre-allocated buffers on the RT thread
+        const UInt32 max_capacity_frames = 4096;
+        if (frameCount > max_capacity_frames) {
+            frameCount = max_capacity_frames;
         }
 
         // Convert to interleaved float32 using pre-allocated buffer
-        if (!ConvertToFloat32Interleaved(bytes, frameCount, fmt, interleaved_buf_)) {
+        if (!ConvertToFloat32Interleaved(bytes, frameCount, fmt, interleaved_buf_.data())) {
             stats_.failed_writes++;
             return;
         }
@@ -583,7 +602,7 @@ private:
             RF_LOG_INFO("Disconnecting: %s", device_uid_.c_str());
 
             // Mark as disconnected
-            atomic_store(&shared_memory_->driver_connected, 0);
+            atomic_store_explicit(&shared_memory_->driver_connected, 0, memory_order_relaxed);
 
             // Calculate size for munmap
             size_t size = rf_shared_audio_size(
@@ -627,7 +646,7 @@ private:
         }
 
         // Mark driver as connected
-        atomic_store(&shared_memory_->driver_connected, 1);
+        atomic_store_explicit(&shared_memory_->driver_connected, 1, memory_order_relaxed);
         RF_DebugLog("ValidateConnection: OK (driver_connected=1)");
 
         return true;
@@ -644,7 +663,7 @@ private:
         }
 
         // Check host connection
-        uint32_t host_conn = atomic_load(&shared_memory_->host_connected);
+        uint32_t host_conn = atomic_load_explicit(&shared_memory_->host_connected, memory_order_relaxed);
         if (host_conn == 0) {
             RF_LOG_ERROR("Health: host disconnected");
             return false;
@@ -652,7 +671,7 @@ private:
 
         // Check heartbeat timeout (treat a never-started heartbeat as unhealthy after timeout)
         auto now = std::chrono::steady_clock::now();
-        uint64_t current_host_hb = atomic_load(&shared_memory_->host_heartbeat);
+        uint64_t current_host_hb = atomic_load_explicit(&shared_memory_->host_heartbeat, memory_order_relaxed);
 
         if (current_host_hb != last_host_hb_) {
             last_host_hb_ = current_host_hb;
@@ -667,8 +686,8 @@ private:
         }
 
         // Check ring buffer integrity
-        uint64_t write_idx = atomic_load(&shared_memory_->write_index);
-        uint64_t read_idx = atomic_load(&shared_memory_->read_index);
+        uint64_t write_idx = atomic_load_explicit(&shared_memory_->write_index, memory_order_relaxed);
+        uint64_t read_idx = atomic_load_explicit(&shared_memory_->read_index, memory_order_relaxed);
 
         if (write_idx < read_idx) {
             RF_LOG_ERROR("Health: corruption (write < read)");
@@ -703,16 +722,18 @@ private:
     }
 
     void ResizeBuffers() {
-        if (!shared_memory_) return;
-
         // Size for max expected callback: 4096 frames at 192kHz, 8 channels
         uint32_t max_frames = 4096;
         uint32_t max_channels = RF_MAX_CHANNELS;
 
         interleaved_buf_.resize(max_frames * max_channels);
         resampled_buf_.resize(max_frames * 2 * max_channels); // 2x for upsampling headroom
-        const uint32_t max_silence_frames = std::max<uint32_t>(
-            1, shared_memory_->ring_capacity_frames / 2);
+        
+        uint32_t capacity_frames = 16384;
+        if (shared_memory_) {
+            capacity_frames = shared_memory_->ring_capacity_frames;
+        }
+        const uint32_t max_silence_frames = std::max<uint32_t>(1, capacity_frames / 2);
         silence_buf_.resize(max_silence_frames * max_channels, 0.0f);
     }
 
@@ -728,15 +749,12 @@ private:
             RF_LOG_INFO("Configured resampler: %.0f -> %u Hz",
                 new_fmt.mSampleRate, shared_memory_->sample_rate);
         }
-
-        ResizeBuffers();
+        // ResizeBuffers() is NOT called on the real-time thread to guarantee lock-free performance
     }
 
     bool ConvertToFloat32Interleaved(const void* bytes, UInt32 frameCount,
                                      const AudioStreamBasicDescription& fmt,
-                                     std::vector<float>& output) {
-        output.resize(frameCount * fmt.mChannelsPerFrame);
-
+                                     float* output) {
         if (fmt.mFormatFlags & kAudioFormatFlagIsFloat) {
             const float* input = static_cast<const float*>(bytes);
             if (fmt.mFormatFlags & kAudioFormatFlagIsNonInterleaved) {
@@ -749,7 +767,7 @@ private:
                 }
             } else {
                 // Already interleaved
-                std::memcpy(output.data(), input, frameCount * fmt.mChannelsPerFrame * sizeof(float));
+                std::memcpy(output, input, frameCount * fmt.mChannelsPerFrame * sizeof(float));
             }
         } else if (fmt.mFormatFlags & kAudioFormatFlagIsSignedInteger) {
             if (fmt.mBitsPerChannel == 16) {
@@ -789,12 +807,13 @@ private:
 
         stats_.sample_rate_conversions++;
 
-        // Calculate output size and ensure buffer is large enough
+        // Calculate output size and ensure buffer is within capacity without resizing
         uint32_t output_capacity =
             static_cast<uint32_t>((input_frames * output_rate) / input_rate) + 10;
-        size_t needed = output_capacity * channels;
-        if (resampled_buf_.size() < needed) {
-            resampled_buf_.resize(needed);
+        
+        const uint32_t max_resampled_frames = 4096 * 2;
+        if (output_capacity > max_resampled_frames) {
+            output_capacity = max_resampled_frames;
         }
 
         uint32_t output_frames = resampler_->Process(
@@ -812,8 +831,8 @@ private:
                                             uint32_t channels) {
         if (!shared_memory_) return;
 
-        const uint64_t write_idx = atomic_load(&shared_memory_->write_index);
-        const uint64_t read_idx = atomic_load(&shared_memory_->read_index);
+        const uint64_t write_idx = atomic_load_explicit(&shared_memory_->write_index, memory_order_relaxed);
+        const uint64_t read_idx = atomic_load_explicit(&shared_memory_->read_index, memory_order_acquire);
         const uint32_t capacity = shared_memory_->ring_capacity_frames;
         const uint64_t used = write_idx - read_idx;
 

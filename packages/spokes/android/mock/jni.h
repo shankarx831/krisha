@@ -42,6 +42,7 @@ struct JNINativeInterface {
     const char* (*GetStringUTFChars)(JNIEnv env, jstring str, jboolean* isCopy);
     void (*ReleaseStringUTFChars)(JNIEnv env, jstring str, const char* chars);
     
+    jsize (*GetArrayLength)(JNIEnv env, jarray array);
     jfloatArray (*NewFloatArray)(JNIEnv env, jsize len);
     void (*SetFloatArrayRegion)(JNIEnv env, jfloatArray array, jsize start, jsize len, const jfloat* buf);
     jfloat* (*GetFloatArrayElements)(JNIEnv env, jfloatArray array, jboolean* isCopy);
@@ -54,6 +55,10 @@ struct JNINativeInterface {
 // C++ JNIEnv wrapper class mirroring the real Android NDK
 struct _JNIEnv {
     const JNINativeInterface* functions;
+
+    jsize GetArrayLength(jarray array) {
+        return functions->GetArrayLength(this, array);
+    }
 
     const char* GetStringUTFChars(jstring str, jboolean* isCopy) {
         return functions->GetStringUTFChars(this, str, isCopy);

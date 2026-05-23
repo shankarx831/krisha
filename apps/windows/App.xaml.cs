@@ -128,6 +128,44 @@ namespace KrishaSpoke.Windows
                 MessageBox.Show($"Uninstallation failed to start: {ex.Message}", "KRISHA Panic Uninstall", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        public static string GetPresetsDirectory()
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string presetsDir = Path.Combine(appData, "Krisha", "Presets");
+            if (!Directory.Exists(presetsDir))
+            {
+                Directory.CreateDirectory(presetsDir);
+            }
+            return presetsDir;
+        }
+
+        public static void SaveCustomPreset(string name, string jsonContent)
+        {
+            try
+            {
+                string path = Path.Combine(GetPresetsDirectory(), $"{name}.json");
+                File.WriteAllText(path, jsonContent);
+                Debug.WriteLine($"[KRISHA WinSpoke] Saved custom preset '{name}' to: {path}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[KRISHA WinSpoke] Failed to save preset: {ex.Message}");
+            }
+        }
+
+        public static string[] LoadCustomPresets()
+        {
+            try
+            {
+                string presetsDir = GetPresetsDirectory();
+                return Directory.GetFiles(presetsDir, "*.json");
+            }
+            catch
+            {
+                return new string[0];
+            }
+        }
     }
 
     /// <summary>
@@ -135,42 +173,211 @@ namespace KrishaSpoke.Windows
     /// </summary>
     public class SettingsWindow : Window
     {
+        private Slider _sliderLeft;
+        private Slider _sliderRight;
+        private TextBlock _txtLeftValue;
+        private TextBlock _txtRightValue;
+        private CheckBox _chkBypass;
+
         public SettingsWindow()
         {
-            Title = "KRISHA Settings & Failsafes";
-            Width = 400;
-            Height = 220;
+            Title = "KRISHA Settings";
+            Width = 460;
+            Height = 350;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            Background = new SolidColorBrush(Color.FromRgb(31, 31, 31));
+            Background = new SolidColorBrush(Color.FromRgb(18, 18, 18));
             ResizeMode = ResizeMode.NoResize;
+            FontFamily = new FontFamily("Segoe UI");
 
-            StackPanel panel = new StackPanel { Margin = new Thickness(20) };
+            Grid rootGrid = new Grid { Margin = new Thickness(24) };
+            rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Title
+            rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // Grid panel
+            rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Panic Button
 
-            Label titleLabel = new Label
+            // Modern subtle title
+            TextBlock titleLabel = new TextBlock
             {
-                Content = "KRISHA Universal Settings",
+                Text = "KRISHA UNIVERSAL",
                 Foreground = Brushes.White,
                 FontSize = 18,
-                FontWeight = FontWeights.Bold,
+                FontWeight = FontWeights.SemiBold,
                 HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+            Grid.SetRow(titleLabel, 0);
+            rootGrid.Children.Add(titleLabel);
+
+            // Container for Settings menu (Fluent card style)
+            StackPanel cardPanel = new StackPanel
+            {
+                Background = new SolidColorBrush(Color.FromRgb(28, 28, 30)),
                 Margin = new Thickness(0, 0, 0, 20)
             };
-            panel.Children.Add(titleLabel);
+            // Add subtle border
+            Border cardBorder = new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromRgb(44, 44, 46)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Child = cardPanel,
+                Padding = new Thickness(16)
+            };
+            Grid.SetRow(cardBorder, 1);
+            rootGrid.Children.Add(cardBorder);
 
+            // Left Preamp control
+            cardPanel.Children.Add(new TextBlock
+            {
+                Text = "Preamp Left Offset",
+                Foreground = new SolidColorBrush(Color.FromRgb(142, 142, 147)),
+                FontSize = 11,
+                FontWeight = FontWeights.Medium,
+                Margin = new Thickness(0, 0, 0, 4)
+            });
+
+            Grid leftSliderGrid = new Grid();
+            leftSliderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            leftSliderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _sliderLeft = new Slider
+            {
+                Minimum = -12.0,
+                Maximum = 12.0,
+                Value = 0.0,
+                TickFrequency = 0.1,
+                IsSnapToTickEnabled = true,
+                Margin = new Thickness(0, 0, 12, 12),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            // Style the slider to use clean Win11 blue accent color
+            _sliderLeft.Foreground = new SolidColorBrush(Color.FromRgb(0, 122, 255));
+            _sliderLeft.ValueChanged += OnSliderLeftChanged;
+
+            _txtLeftValue = new TextBlock
+            {
+                Text = "0.0 dB",
+                Foreground = Brushes.White,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                Width = 50,
+                TextAlignment = TextAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+
+            Grid.SetColumn(_sliderLeft, 0);
+            Grid.SetColumn(_txtLeftValue, 1);
+            leftSliderGrid.Children.Add(_sliderLeft);
+            leftSliderGrid.Children.Add(_txtLeftValue);
+            cardPanel.Children.Add(leftSliderGrid);
+
+            // Right Preamp control
+            cardPanel.Children.Add(new TextBlock
+            {
+                Text = "Preamp Right Offset",
+                Foreground = new SolidColorBrush(Color.FromRgb(142, 142, 147)),
+                FontSize = 11,
+                FontWeight = FontWeights.Medium,
+                Margin = new Thickness(0, 4, 0, 4)
+            });
+
+            Grid rightSliderGrid = new Grid();
+            rightSliderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            rightSliderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _sliderRight = new Slider
+            {
+                Minimum = -12.0,
+                Maximum = 12.0,
+                Value = 0.0,
+                TickFrequency = 0.1,
+                IsSnapToTickEnabled = true,
+                Margin = new Thickness(0, 0, 12, 16),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _sliderRight.Foreground = new SolidColorBrush(Color.FromRgb(0, 122, 255));
+            _sliderRight.ValueChanged += OnSliderRightChanged;
+
+            _txtRightValue = new TextBlock
+            {
+                Text = "0.0 dB",
+                Foreground = Brushes.White,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                Width = 50,
+                TextAlignment = TextAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+
+            Grid.SetColumn(_sliderRight, 0);
+            Grid.SetColumn(_txtRightValue, 1);
+            rightSliderGrid.Children.Add(_sliderRight);
+            rightSliderGrid.Children.Add(_txtRightValue);
+            cardPanel.Children.Add(rightSliderGrid);
+
+            // Bypass Switch
+            _chkBypass = new CheckBox
+            {
+                Content = "Bypass DSP Processing",
+                Foreground = Brushes.White,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _chkBypass.Checked += OnBypassChanged;
+            _chkBypass.Unchecked += OnBypassChanged;
+            cardPanel.Children.Add(_chkBypass);
+
+            // Uninstall / Panic Button at the bottom
             Button btnUninstall = new Button
             {
                 Content = "Uninstall Audio Driver (Panic Button)",
                 Background = new SolidColorBrush(Color.FromRgb(255, 59, 48)),
                 Foreground = Brushes.White,
-                FontWeight = FontWeights.Bold,
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 12,
                 Padding = new Thickness(12),
-                Margin = new Thickness(0, 10, 0, 10),
-                BorderThickness = new Thickness(0)
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand
             };
-            btnUninstall.Click += (s, e) => App.RunUninstallScript();
-            panel.Children.Add(btnUninstall);
+            // Rounded corners using a helper template
+            ControlTemplate template = new ControlTemplate(typeof(Button));
+            FrameworkElementFactory elem = new FrameworkElementFactory(typeof(Border));
+            elem.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+            elem.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
+            FrameworkElementFactory presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            elem.AppendChild(presenter);
+            template.VisualTree = elem;
+            btnUninstall.Template = template;
 
-            Content = panel;
+            btnUninstall.Click += (s, e) => App.RunUninstallScript();
+            Grid.SetRow(btnUninstall, 2);
+            rootGrid.Children.Add(btnUninstall);
+
+            Content = rootGrid;
+        }
+
+        private void OnSliderLeftChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            float val = (float)_sliderLeft.Value;
+            _txtLeftValue.Text = string.Format("{0:0.0} dB", val);
+            ((App)Application.Current).WritePreampLeft(val);
+        }
+
+        private void OnSliderRightChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            float val = (float)_sliderRight.Value;
+            _txtRightValue.Text = string.Format("{0:0.0} dB", val);
+            ((App)Application.Current).WritePreampRight(val);
+        }
+
+        private void OnBypassChanged(object sender, RoutedEventArgs e)
+        {
+            bool isBypass = _chkBypass.IsChecked == true;
+            ((App)Application.Current).WriteBypass(isBypass);
         }
     }
 

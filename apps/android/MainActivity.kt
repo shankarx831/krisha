@@ -1,34 +1,46 @@
 package com.krisha.spoke.android
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.log10
-import kotlin.math.pow
+import org.json.JSONArray
+import org.json.JSONObject
+import kotlin.math.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Load the Phase 2 JNI bridge containing the static C++ Core linking
         try {
             System.loadLibrary("krisha_jni")
         } catch (e: Exception) {
@@ -39,8 +51,8 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(
                 colorScheme = darkColorScheme(
                     background = Color(0xFF0F0F11),
-                    surface = Color(0xFF1E1E22),
-                    primary = Color(0xFF00E5E5)
+                    surface = Color(0xFF16161A),
+                    primary = Color(0xFF007AFF)
                 )
             ) {
                 Surface(
@@ -54,129 +66,644 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// Flat preset representational constant
+private val FlatPreset = AutoEqPresetResult(
+    name = "Flat",
+    preampDb = 0.0f,
+    preampLeftDb = 0.0f,
+    preampRightDb = 0.0f,
+    bands = emptyList()
+)
+
+// Helper: Convert preset to a packed flat float array for JNI
+private fun presetToFlatArray(preset: AutoEqPresetResult): FloatArray {
+    val numBands = preset.bands.size
+    val flat = FloatArray(4 + numBands * 4)
+    flat[0] = preset.preampDb
+    flat[1] = preset.preampLeftDb
+    flat[2] = preset.preampRightDb
+    flat[3] = numBands.toFloat()
+    
+    for (i in 0 until numBands) {
+        val base = 4 + i * 4
+        val band = preset.bands[i]
+        flat[base] = band.frequencyHz
+        flat[base + 1] = band.gainDb
+        flat[base + 2] = band.qFactor
+        flat[base + 3] = band.filterType.toFloat()
+    }
+    return flat
+}
+
+// Helper: Serialise preset to JSON
+private fun presetToJson(preset: AutoEqPresetResult): String {
+    val json = JSONObject()
+    json.put("name", preset.name)
+    json.put("preampDb", preset.preampDb.toDouble())
+    json.put("preampLeftDb", preset.preampLeftDb.toDouble())
+    json.put("preampRightDb", preset.preampRightDb.toDouble())
+    
+    val bandsArray = JSONArray()
+    preset.bands.forEach { band ->
+        val bandJson = JSONObject()
+        bandJson.put("frequencyHz", band.frequencyHz.toDouble())
+        bandJson.put("gainDb", band.gainDb.toDouble())
+        bandJson.put("qFactor", band.qFactor.toDouble())
+        bandJson.put("filterType", band.filterType)
+        bandsArray.put(bandJson)
+    }
+    json.put("bands", bandsArray)
+    return json.toString()
+}
+
+// Helper: Deserialise preset from JSON
+private fun jsonToPreset(jsonStr: String): AutoEqPresetResult {
+    val json = JSONObject(jsonStr)
+    val name = json.getString("name")
+    val preampDb = json.getDouble("preampDb").toFloat()
+    val preampLeftDb = json.getDouble("preampLeftDb").toFloat()
+    val preampRightDb = json.getDouble("preampRightDb").toFloat()
+    
+    val bandsArray = json.getJSONArray("bands")
+    val bands = ArrayList<AutoEqBand>()
+    for (i in 0 until bandsArray.length()) {
+        val bandJson = bandsArray.getJSONObject(i)
+        bands.add(
+            AutoEqBand(
+                frequencyHz = bandJson.getDouble("frequencyHz").toFloat(),
+                gainDb = bandJson.getDouble("gainDb").toFloat(),
+                qFactor = bandJson.getDouble("qFactor").toFloat(),
+                filterType = bandJson.getInt("filterType")
+            )
+        )
+    }
+    return AutoEqPresetResult(name, preampDb, preampLeftDb, preampRightDb, bands)
+}
+
+// SharedPreferences management
+private const val PREFS_NAME = "KrishaPrefs"
+private const val PRESETS_KEY = "KrishaCustomPresets"
+
+private fun getSavedPresets(context: Context): List<AutoEqPresetResult> {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    val jsonStr = prefs.getString(PRESETS_KEY, null) ?: return emptyList()
+    return try {
+        val array = JSONArray(jsonStr)
+        val list = ArrayList<AutoEqPresetResult>()
+        for (i in 0 until array.length()) {
+            list.add(jsonToPreset(array.getString(i)))
+        }
+        list
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
+private fun savePresets(context: Context, presets: List<AutoEqPresetResult>) {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    val array = JSONArray()
+    presets.forEach { preset ->
+        array.put(presetToJson(preset))
+    }
+    prefs.edit().putString(PRESETS_KEY, array.toString()).apply()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KrishaScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+    // Preset state
+    var savedPresetsList by remember { mutableStateOf(getSavedPresets(context)) }
+    var activePreset by remember { mutableStateOf(FlatPreset) }
+    
+    // Audio control states
     var preampLeft by remember { mutableStateOf(0.0f) }
     var preampRight by remember { mutableStateOf(0.0f) }
     var isBypass by remember { mutableStateOf(false) }
     
-    val coroutineScope = rememberCoroutineScope()
+    // AutoEq search & import states
+    var autoEqInput by remember { mutableStateOf("") }
+    var isFetching by remember { mutableStateOf(false) }
+    var customPresetName by remember { mutableStateOf("") }
+    var loadedDynamicPreset by remember { mutableStateOf<AutoEqPresetResult?>(null) }
+    
+    // Magnitude curves
     val stepsCount = 120
     var leftMagnitudes by remember { mutableStateOf(FloatArray(stepsCount)) }
     var rightMagnitudes by remember { mutableStateOf(FloatArray(stepsCount)) }
+    var harmanMagnitudes by remember { mutableStateOf(FloatArray(stepsCount)) }
 
-    // Reactive off-thread JNI/DSP graph calculations using standard Coroutines
-    LaunchedEffect(preampLeft, preampRight, isBypass) {
-        coroutineScope.launch {
+    // Synchronize loaded preset coefficients into active DSP engine
+    fun applyPresetToEngine(preset: AutoEqPresetResult) {
+        activePreset = preset
+        preampLeft = preset.preampLeftDb
+        preampRight = preset.preampRightDb
+        
+        try {
+            val flatArray = presetToFlatArray(preset)
+            KrishaJNI.applyPreset(flatArray)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    // Recalculate curves when settings change (lock-free, off-thread)
+    LaunchedEffect(preampLeft, preampRight, isBypass, activePreset) {
+        scope.launch {
             val response = withContext(Dispatchers.Default) {
                 calculateBiquadMagnitudes(preampLeft, preampRight, isBypass, stepsCount)
             }
             leftMagnitudes = response.first
             rightMagnitudes = response.second
+            harmanMagnitudes = response.third
         }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // App HUD Header
         Text(
             text = "KRISHA UNIVERSAL",
-            fontSize = 22.sp,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
             color = Color.White,
-            modifier = Modifier.padding(top = 16.dp)
+            letterSpacing = 2.sp,
+            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
         )
 
-        // Sleek Logarithmic Canvas Graph Component
+        // Dual magnitude visual graph
         EQResponseGraph(
             leftMags = leftMagnitudes,
             rightMags = rightMagnitudes,
+            harmanMags = harmanMagnitudes,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(200.dp)
-                .background(Color(0xFF16161B), RoundedCornerShape(12.dp))
-                .padding(8.dp)
+                .background(Color(0xFF16161A), RoundedCornerShape(12.dp))
+                .padding(12.dp)
         )
 
-        // Balance & Preamp Slider Area
+        // Comparison Stats HUD overlay
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E22))
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF16161A)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "ACTIVE PRESET: ${activePreset.name.uppercase()}",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Calculate RMS deviation
+                var rmsDeviation = 0.0f
+                var sumSq = 0.0f
+                for (i in 0 until stepsCount) {
+                    val activeDb = rightMagnitudes[i]
+                    val harmanDb = harmanMagnitudes[i]
+                    val diff = activeDb - harmanDb
+                    sumSq += diff * diff
+                }
+                rmsDeviation = sqrt(sumSq / stepsCount)
+                
+                Text(
+                    text = String.format("Harman Target RMS Deviation: %.2f dB", rmsDeviation),
+                    color = if (rmsDeviation < 2.0f) Color(0xFF34C759) else Color(0xFFFF9500),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        // Preset selector Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF16161A)),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Preamp Offset Balance", color = Color.White, fontSize = 16.sp)
+                Text(
+                    text = "PRESETS",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp
+                )
 
-                // Left Slider
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("L", color = Color(0xFF00E5E5), modifier = Modifier.width(20.dp))
-                    Slider(
-                        value = preampLeft,
-                        onValueChange = { preampLeft = it },
-                        valueRange = -12.0f..12.0f,
-                        modifier = Modifier.weight(1f),
-                        colors = SliderDefaults.colors(
-                            activeTrackColor = Color(0xFF00E5E5),
-                            thumbColor = Color(0xFF00E5E5)
-                        )
+                // Render presets selection
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF222228), RoundedCornerShape(8.dp))
+                        .clickable {
+                            applyPresetToEngine(FlatPreset)
+                            Toast.makeText(context, "Loaded Flat curve", Toast.LENGTH_SHORT).show()
+                        }
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Programmatic Flat Baseline",
+                        color = if (activePreset.name == "Flat") Color(0xFF007AFF) else Color.White,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 13.sp
                     )
-                    Text(String.format("%.1f dB", preampLeft), color = Color.Gray, modifier = Modifier.width(60.dp))
                 }
 
-                // Right Slider
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("R", color = Color(0xFFFF0099), modifier = Modifier.width(20.dp))
-                    Slider(
-                        value = preampRight,
-                        onValueChange = { preampRight = it },
-                        valueRange = -12.0f..12.0f,
-                        modifier = Modifier.weight(1f),
-                        colors = SliderDefaults.colors(
-                            activeTrackColor = Color(0xFFFF0099),
-                            thumbColor = Color(0xFFFF0099)
+                // Custom saved presets
+                savedPresetsList.forEach { preset ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF222228), RoundedCornerShape(8.dp))
+                            .clickable {
+                                applyPresetToEngine(preset)
+                                Toast.makeText(context, "Loaded preset: ${preset.name}", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = preset.name,
+                            color = if (activePreset.name == preset.name) Color(0xFF007AFF) else Color.White,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 13.sp,
+                            modifier = Modifier.weight(1f)
                         )
-                    )
-                    Text(String.format("%.1f dB", preampRight), color = Color.Gray, modifier = Modifier.width(60.dp))
+                        IconButton(
+                            onClick = {
+                                val updated = savedPresetsList.filter { it.name != preset.name }
+                                savePresets(context, updated)
+                                savedPresetsList = updated
+                                if (activePreset.name == preset.name) {
+                                    applyPresetToEngine(FlatPreset)
+                                }
+                                Toast.makeText(context, "Preset deleted", Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = Color(0xFFFF3B30)
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        val activity = androidx.compose.ui.platform.LocalContext.current as? androidx.activity.ComponentActivity
-
-        // Bypass switch
-        Row(
+        // AutoEq Import Engine Card
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF16161A)),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Text("Bypass DSP Processing", color = Color.White)
-            Switch(
-                checked = isBypass,
-                onCheckedChange = { isBypass = it }
-            )
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "AUTOEQ IMPORT ENGINE",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp
+                )
+
+                OutlinedTextField(
+                    value = autoEqInput,
+                    onValueChange = { autoEqInput = it },
+                    label = { Text("Headphone Search Path (e.g. sennheiser/hd_600)", fontSize = 12.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF007AFF),
+                        unfocusedBorderColor = Color(0xFF2C2C2E)
+                    ),
+                    singleLine = true
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            if (autoEqInput.isEmpty()) {
+                                Toast.makeText(context, "Search path cannot be empty", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            isFetching = true
+                            scope.launch {
+                                val search = AutoEqSearch()
+                                val result = search.fetchAndParsePreset(autoEqInput)
+                                isFetching = false
+                                if (result != null) {
+                                    loadedDynamicPreset = result
+                                    customPresetName = result.name
+                                    applyPresetToEngine(result)
+                                    Toast.makeText(context, "Successfully loaded: ${result.name}", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Failed to download from AutoEq", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007AFF)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        if (isFetching) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
+                        } else {
+                            Text("Fetch", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // Clipboard import helper
+                    Button(
+                        onClick = {
+                            try {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = clipboard.primaryClip
+                                if (clip != null && clip.itemCount > 0) {
+                                    val text = clip.getItemAt(0).text.toString()
+                                    scope.launch(Dispatchers.Default) {
+                                        val flatArray = KrishaJNI.parseAutoEq(text)
+                                        withContext(Dispatchers.Main) {
+                                            if (flatArray != null && flatArray.size >= 4) {
+                                                val preampGlobal = flatArray[0]
+                                                val preampLeft = flatArray[1]
+                                                val preampRight = flatArray[2]
+                                                val numBands = flatArray[3].toInt()
+                                                
+                                                val bands = ArrayList<AutoEqBand>()
+                                                for (i in 0 until numBands) {
+                                                    val base = 4 + i * 4
+                                                    if (base + 3 < flatArray.size) {
+                                                        bands.add(
+                                                            AutoEqBand(
+                                                                frequencyHz = flatArray[base],
+                                                                gainDb = flatArray[base + 1],
+                                                                qFactor = flatArray[base + 2],
+                                                                filterType = flatArray[base + 3].toInt()
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                                
+                                                val importedPreset = AutoEqPresetResult(
+                                                    name = "Imported",
+                                                    preampDb = preampGlobal,
+                                                    preampLeftDb = preampLeft,
+                                                    preampRightDb = preampRight,
+                                                    bands = bands
+                                                )
+                                                loadedDynamicPreset = importedPreset
+                                                customPresetName = "Imported EQ"
+                                                applyPresetToEngine(importedPreset)
+                                                Toast.makeText(context, "Successfully loaded from Clipboard!", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, "Invalid ParametricEQ clipboard data", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Toast.makeText(context, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed to read clipboard", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C2E)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Paste EQ", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+
+                // Custom preset name and save button
+                loadedDynamicPreset?.let { preset ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = customPresetName,
+                            onValueChange = { customPresetName = it },
+                            label = { Text("Preset Label", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1.5f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF007AFF),
+                                unfocusedBorderColor = Color(0xFF2C2C2E)
+                            ),
+                            singleLine = true
+                        )
+
+                        Button(
+                            onClick = {
+                                if (customPresetName.trim().isEmpty()) {
+                                    Toast.makeText(context, "Preset name cannot be blank", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                val toSave = preset.copy(name = customPresetName.trim())
+                                val currentList = savedPresetsList.filter { it.name != toSave.name }.toMutableList()
+                                currentList.add(toSave)
+                                savePresets(context, currentList)
+                                savedPresetsList = currentList
+                                applyPresetToEngine(toSave)
+                                Toast.makeText(context, "Preset saved to persistent storage!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34C759)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Save", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Balance & Preamp Slider Area (Material 3 settings layout)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF16161A)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "PREAMP BALANCE",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp
+                )
 
-        // Reset & Stop Panic Button
+                // Left Slider
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "L",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(24.dp)
+                    )
+                    Slider(
+                        value = preampLeft,
+                        onValueChange = { 
+                            preampLeft = it 
+                            // Update JNI in real-time
+                            try {
+                                KrishaJNI.updatePreamp(preampLeft, preampRight)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        valueRange = -12.0f..12.0f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = Color(0xFF007AFF),
+                            inactiveTrackColor = Color(0xFF2C2C2E),
+                            thumbColor = Color(0xFF007AFF)
+                        )
+                    )
+                    Text(
+                        text = String.format("%.1f dB", preampLeft),
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 12.sp,
+                        modifier = Modifier.width(55.dp),
+                        textAlign = TextAlign.End
+                    )
+                }
+
+                // Right Slider
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "R",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(24.dp)
+                    )
+                    Slider(
+                        value = preampRight,
+                        onValueChange = { 
+                            preampRight = it 
+                            // Update JNI in real-time
+                            try {
+                                KrishaJNI.updatePreamp(preampLeft, preampRight)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        valueRange = -12.0f..12.0f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = Color(0xFF007AFF),
+                            inactiveTrackColor = Color(0xFF2C2C2E),
+                            thumbColor = Color(0xFF007AFF)
+                        )
+                    )
+                    Text(
+                        text = String.format("%.1f dB", preampRight),
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 12.sp,
+                        modifier = Modifier.width(55.dp),
+                        textAlign = TextAlign.End
+                    )
+                }
+            }
+        }
+
+        // Bypass Switch Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF16161A)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Bypass DSP Processing",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Switch(
+                    checked = isBypass,
+                    onCheckedChange = { isBypass = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color(0xFF007AFF),
+                        uncheckedThumbColor = Color.Gray,
+                        uncheckedTrackColor = Color(0xFF2C2C2E)
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Panic Button (Subtle, sleek, rounded)
         Button(
             onClick = {
                 preampLeft = 0.0f
                 preampRight = 0.0f
                 isBypass = true
+                applyPresetToEngine(FlatPreset)
+                val activity = context as? ComponentActivity
                 activity?.finishAndRemoveTask()
                 kotlin.system.exitProcess(0)
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B30)),
-            modifier = Modifier.fillMaxWidth()
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
         ) {
-            Text("Reset & Stop KRISHA (Panic Button)", color = Color.White)
+            Text(
+                text = "Uninstall / Panic Stop Driver",
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -185,6 +712,7 @@ fun KrishaScreen() {
 fun EQResponseGraph(
     leftMags: FloatArray,
     rightMags: FloatArray,
+    harmanMags: FloatArray,
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier) {
@@ -199,7 +727,7 @@ fun EQResponseGraph(
             val ratio = (log10(f) - logMin) / (logMax - logMin)
             val x = ratio * width
             drawLine(
-                color = Color(0x33FFFFFF),
+                color = Color(0x1AFFFFFF),
                 start = Offset(x, 0f),
                 end = Offset(x, height),
                 strokeWidth = 1.dp.toPx()
@@ -212,18 +740,50 @@ fun EQResponseGraph(
             val ratio = 1f - (db + 12f) / 24f
             val y = ratio * height
             drawLine(
-                color = Color(0x33FFFFFF),
+                color = Color(0x1AFFFFFF),
                 start = Offset(0f, y),
                 end = Offset(width, y),
                 strokeWidth = 1.dp.toPx()
             )
         }
 
-        // Render Left Channel - Neon Cyan
+        // 1. Draw Line B: Harman Reference Target Baseline (Muted, finely dashed, low-opacity gray/white)
+        val harmanPath = Path()
+        for (i in harmanMags.indices) {
+            val x = (i.toFloat() / (harmanMags.size - 1)) * width
+            val gainDb = harmanMags[i].coerceIn(-12.0f, 12.0f)
+            val y = (1.0f - (gainDb + 12.0f) / 24.0f) * height
+
+            if (i == 0) harmanPath.moveTo(x, y) else harmanPath.lineTo(x, y)
+        }
+        drawPath(
+            path = harmanPath,
+            color = Color.White.copy(alpha = 0.35f),
+            style = Stroke(
+                width = 1.5f.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f)
+            )
+        )
+
+        // 2. Draw Line A (Right/Active channel - Solid Accent Blue)
+        val activePath = Path()
+        for (i in rightMags.indices) {
+            val x = (i.toFloat() / (rightMags.size - 1)) * width
+            val gainDb = rightMags[i].coerceIn(-12.0f, 12.0f)
+            val y = (1.0f - (gainDb + 12.0f) / 24.0f) * height
+
+            if (i == 0) activePath.moveTo(x, y) else activePath.lineTo(x, y)
+        }
+        drawPath(
+            path = activePath,
+            color = Color(0xFF007AFF),
+            style = Stroke(width = 2.5f.dp.toPx())
+        )
+
+        // 3. Draw Left channel (Muted solid gray line)
         val leftPath = Path()
         for (i in leftMags.indices) {
             val x = (i.toFloat() / (leftMags.size - 1)) * width
-            // Bound dB to structural limits
             val gainDb = leftMags[i].coerceIn(-12.0f, 12.0f)
             val y = (1.0f - (gainDb + 12.0f) / 24.0f) * height
 
@@ -231,42 +791,23 @@ fun EQResponseGraph(
         }
         drawPath(
             path = leftPath,
-            color = Color(0xFF00E5E5),
-            style = Stroke(width = 2.dp.toPx())
-        )
-
-        // Render Right Channel - Neon Magenta
-        val rightPath = Path()
-        for (i in rightMags.indices) {
-            val x = (i.toFloat() / (rightMags.size - 1)) * width
-            val gainDb = rightMags[i].coerceIn(-12.0f, 12.0f)
-            val y = (1.0f - (gainDb + 12.0f) / 24.0f) * height
-
-            if (i == 0) rightPath.moveTo(x, y) else rightPath.lineTo(x, y)
-        }
-        drawPath(
-            path = rightPath,
-            color = Color(0xFFFF0099),
-            style = Stroke(width = 2.dp.toPx())
+            color = Color(0xFF8E8E93).copy(alpha = 0.6f),
+            style = Stroke(width = 1.5f.dp.toPx())
         )
     }
 }
 
-/**
- * Invokes the local native JNI bridge to query the underlying DSP magnitude responses.
- */
+// Off-thread DSP calculations
 private fun calculateBiquadMagnitudes(
     preampLeft: Float,
     preampRight: Float,
     isBypass: Boolean,
     steps: Int
-): Pair<FloatArray, FloatArray> {
+): Triple<FloatArray, FloatArray, FloatArray> {
     val left = FloatArray(steps)
     val right = FloatArray(steps)
+    val harman = FloatArray(steps)
 
-    if (isBypass) return Pair(left, right)
-
-    // Calculate response
     val logMin = log10(20.0)
     val logMax = log10(20000.0)
     val step = (logMax - logMin) / (steps - 1)
@@ -274,19 +815,35 @@ private fun calculateBiquadMagnitudes(
     for (i in 0 until steps) {
         val freq = 10.0.pow(logMin + i * step).toFloat()
         
-        // P/Invoke-style JNI calls back to the static JNI lib exported in Phase 2
+        // Query the static Harman Target Baseline
         try {
-            left[i] = preampLeft + queryJniMagnitude(freq, true)
-            right[i] = preampRight + queryJniMagnitude(freq, false)
+            harman[i] = KrishaJNI.queryJniHarmanTarget(freq)
         } catch (e: Exception) {
-            // Fallback for simulation when JNI shared lib is offline
+            harman[i] = calculateHarmanFallback(freq)
+        }
+
+        if (isBypass) {
             left[i] = preampLeft
             right[i] = preampRight
+        } else {
+            try {
+                // Query active magnitudes from C++ DSP engine
+                left[i] = KrishaJNI.queryJniMagnitude(freq, true)
+                right[i] = KrishaJNI.queryJniMagnitude(freq, false)
+            } catch (e: Exception) {
+                left[i] = preampLeft
+                right[i] = preampRight
+            }
         }
     }
 
-    return Pair(left, right)
+    return Triple(left, right, harman)
 }
 
-// Native functions provided by the C++ JNI Spoke
-private external fun queryJniMagnitude(frequencyHz: Float, isLeft: Boolean): Float
+private fun calculateHarmanFallback(frequencyHz: Float): Float {
+    val f = frequencyHz.toDouble()
+    val bassBoost = 5.0 / (1.0 + (f / 100.0).pow(2.0))
+    val earGain = 8.0 * exp(-0.5 * (log10(f / 3000.0) / 0.2).pow(2.0))
+    val treblePeak = 2.0 * exp(-0.5 * (log10(f / 6000.0) / 0.15).pow(2.0))
+    return (bassBoost + earGain + treblePeak - 4.0).toFloat()
+}

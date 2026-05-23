@@ -100,153 +100,58 @@ class PresetManager: ObservableObject {
         userPresetIDs = Set(userPresets.map { $0.id })
     }
 
-    /// Load bundled presets from app Resources
+    /// Load bundled presets (Flat curve created programmatically)
     private func loadBundledPresets() -> [EQPreset] {
-        var presetsPath: String?
-
-        // Debug info
-        print("[PresetManager] Looking for bundled presets...")
-        print("[PresetManager] Bundle.main.resourcePath: \(Bundle.main.resourcePath ?? "nil")")
-        print("[PresetManager] Bundle.main.executablePath: \(Bundle.main.executablePath ?? "nil")")
-        print("[PresetManager] CWD: \(FileManager.default.currentDirectoryPath)")
-
-        // Try bundle resources first (production)
-        if let resourcePath = Bundle.main.resourcePath {
-            let bundlePath = (resourcePath as NSString).appendingPathComponent("Presets")
-            print("[PresetManager] Trying bundle path: \(bundlePath)")
-            if FileManager.default.fileExists(atPath: bundlePath) {
-                presetsPath = bundlePath
-                print("[PresetManager] Found at bundle path")
-            }
-        }
-
-        // Fall back to source directory (development - swift build)
-        if presetsPath == nil {
-            if let executablePath = Bundle.main.executablePath {
-                let executableDir = (executablePath as NSString).deletingLastPathComponent
-
-                // For .build/debug/KrishaApp -> Sources/Resources/Presets
-                let debugPath = (executableDir as NSString).appendingPathComponent(
-                    "../../Sources/Resources/Presets")
-                let normalizedDebugPath = (debugPath as NSString).standardizingPath
-                print("[PresetManager] Trying debug path: \(normalizedDebugPath)")
-                if FileManager.default.fileExists(atPath: normalizedDebugPath) {
-                    presetsPath = normalizedDebugPath
-                    print("[PresetManager] Found at debug path")
-                }
-            }
-        }
-
-        // Try finding based on current working directory
-        if presetsPath == nil {
-            let cwd = FileManager.default.currentDirectoryPath
-            let possiblePaths = [
-                "\(cwd)/Sources/Resources/Presets",
-                "\(cwd)/apps/mac/KrishaApp/Sources/Resources/Presets",
-                // Add home directory fallback for when launched from various locations
-                NSString(string: "~/krisha/apps/mac/KrishaApp/Sources/Resources/Presets")
-                    .expandingTildeInPath,
-                NSString(string: "~/krisha/apps/mac/KrishaApp/Sources/Resources/Presets")
-                    .expandingTildeInPath,
-            ]
-            for path in possiblePaths {
-                print("[PresetManager] Trying CWD path: \(path)")
-                if FileManager.default.fileExists(atPath: path) {
-                    presetsPath = path
-                    print("[PresetManager] Found at CWD path")
-                    break
-                }
-            }
-        }
-
-        guard let finalPath = presetsPath else {
-            print("[PresetManager] ERROR: Presets directory not found anywhere!")
-            return []
-        }
-
-        print("[PresetManager] Loading presets from: \(finalPath)")
-
-        let fileManager = FileManager.default
-        guard let files = try? fileManager.contentsOfDirectory(atPath: finalPath) else {
-            print("[PresetManager] ERROR: Failed to read presets directory")
-            return []
-        }
-
-        let jsonFiles = files.filter { $0.hasSuffix(".json") }
-        print("[PresetManager] Found \(jsonFiles.count) JSON files: \(jsonFiles)")
-
-        let presets =
-            jsonFiles
-            .compactMap { filename -> EQPreset? in
-                let url = URL(fileURLWithPath: finalPath).appendingPathComponent(filename)
-                do {
-                    return try loadPreset(from: url)
-                } catch {
-                    print("[PresetManager] ERROR: Failed to load \(filename): \(error)")
-                    return nil
-                }
-            }
-            .sorted { $0.name < $1.name }
-
-        print(
-            "[PresetManager] Loaded \(presets.count) bundled presets: \(presets.map { $0.name })")
-        return presets
+        return [EQPreset.flat()]
     }
 
-    /// Load user presets from Application Support
+    /// Load user presets from UserDefaults
     private func loadUserPresets() -> [EQPreset] {
-        print("[PresetManager] Loading user presets from: \(userPresetsURL.path)")
-
-        guard
-            let files = try? FileManager.default.contentsOfDirectory(
-                at: userPresetsURL,
-                includingPropertiesForKeys: nil
-            )
-        else {
-            print("[PresetManager] No user presets directory or empty")
+        print("[PresetManager] Loading user presets from UserDefaults...")
+        guard let data = UserDefaults.standard.data(forKey: "KrishaCustomPresets") else {
+            print("[PresetManager] No user presets found in UserDefaults")
             return []
         }
-
-        let presets =
-            files
-            .filter { $0.pathExtension == "json" }
-            .compactMap { try? loadPreset(from: $0) }
-            .sorted { $0.name < $1.name }
-
-        print("[PresetManager] Loaded \(presets.count) user presets: \(presets.map { $0.name })")
-        return presets
+        do {
+            let presets = try JSONDecoder().decode([EQPreset].self, from: data)
+            print("[PresetManager] Loaded \(presets.count) user presets from UserDefaults")
+            return presets.sorted { $0.name < $1.name }
+        } catch {
+            print("[PresetManager] ERROR decoding user presets from UserDefaults: \(error)")
+            return []
+        }
     }
 
-    /// Load preset from file
-    private func loadPreset(from url: URL) throws -> EQPreset {
-        let data = try Data(contentsOf: url)
-        let decoder = JSONDecoder()
-        return try decoder.decode(EQPreset.self, from: data)
-    }
-
-    /// Save user preset
+    /// Save user preset to UserDefaults
     func savePreset(_ preset: EQPreset) throws {
         guard preset.isValid() else {
             throw PresetError.invalidPreset
         }
 
-        let filename = sanitizeFilename(preset.name) + ".json"
-        let url = userPresetsURL.appendingPathComponent(filename)
+        var currentPresets = loadUserPresets()
+        // Replace existing preset with the same ID or name, or append new one
+        if let idx = currentPresets.firstIndex(where: { $0.id == preset.id || $0.name == preset.name }) {
+            currentPresets[idx] = preset
+        } else {
+            currentPresets.append(preset)
+        }
 
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(preset)
-        try data.write(to: url, options: .atomic)
-
+        let data = try encoder.encode(currentPresets)
+        UserDefaults.standard.set(data, forKey: "KrishaCustomPresets")
+        print("[PresetManager] Saved preset '\(preset.name)' to UserDefaults")
         loadAllPresets()
     }
 
-    /// Delete user preset
+    /// Delete user preset from UserDefaults
     func deletePreset(_ preset: EQPreset) throws {
-        let filename = sanitizeFilename(preset.name) + ".json"
-        let url = userPresetsURL.appendingPathComponent(filename)
-        try FileManager.default.removeItem(at: url)
+        var currentPresets = loadUserPresets()
+        currentPresets.removeAll(where: { $0.id == preset.id || $0.name == preset.name })
 
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(currentPresets)
+        UserDefaults.standard.set(data, forKey: "KrishaCustomPresets")
+        print("[PresetManager] Deleted preset '\(preset.name)' from UserDefaults")
         loadAllPresets()
     }
 

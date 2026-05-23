@@ -21,6 +21,11 @@ object KrishaJNI {
      * Returns flat array: [preamp, preamp_left, preamp_right, num_bands, f0, g0, q0, t0, ...]
      */
     external fun parseAutoEq(autoEqText: String): FloatArray?
+
+    external fun applyPreset(flatPresetArray: FloatArray): Boolean
+    external fun updatePreamp(preampLeft: Float, preampRight: Float)
+    external fun queryJniMagnitude(frequencyHz: Float, isLeft: Boolean): Float
+    external fun queryJniHarmanTarget(frequencyHz: Float): Float
 }
 
 class AutoEqSearch {

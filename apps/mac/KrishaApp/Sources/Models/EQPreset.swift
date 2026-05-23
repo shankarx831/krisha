@@ -68,15 +68,15 @@ struct EQPreset: Codable, Identifiable, Equatable {
     func isValid() -> Bool {
         guard !name.isEmpty && name.count <= 64 else { return false }
         guard bands.count >= 1 && bands.count <= 10 else { return false }
-        guard (-12.0...12.0).contains(preampDb) else { return false }
-        guard (-12.0...12.0).contains(preampLeftDb) else { return false }
-        guard (-12.0...12.0).contains(preampRightDb) else { return false }
+        guard (-36.0...36.0).contains(preampDb) else { return false }
+        guard (-36.0...36.0).contains(preampLeftDb) else { return false }
+        guard (-36.0...36.0).contains(preampRightDb) else { return false }
         guard (-6.0...0.0).contains(limiterThresholdDb) else { return false }
 
         for band in bands {
             guard (20.0...20000.0).contains(band.frequencyHz) else { return false }
-            guard (-12.0...12.0).contains(band.gainDb) else { return false }
-            guard (0.1...10.0).contains(band.qFactor) else { return false }
+            guard (-36.0...36.0).contains(band.gainDb) else { return false }
+            guard (0.01...100.0).contains(band.qFactor) else { return false }
         }
 
         return true

@@ -71,13 +71,13 @@ krisha_error_t krisha_dsp_preset_validate(const krisha_preset_t* preset) {
             return KRISHA_ERROR_INVALID_PARAM;
         }
 
-        // Validate gain (-12 dB to +12 dB)
-        if (band->gain_db < -12.0f || band->gain_db > 12.0f) {
+        // Validate gain (-36 dB to +36 dB)
+        if (band->gain_db < -36.0f || band->gain_db > 36.0f) {
             return KRISHA_ERROR_INVALID_PARAM;
         }
 
-        // Validate Q factor (0.1 to 10.0)
-        if (band->q_factor < 0.1f || band->q_factor > 10.0f) {
+        // Validate Q factor (0.01 to 100.0)
+        if (band->q_factor < 0.01f || band->q_factor > 100.0f) {
             return KRISHA_ERROR_INVALID_PARAM;
         }
 
@@ -93,10 +93,10 @@ krisha_error_t krisha_dsp_preset_validate(const krisha_preset_t* preset) {
         return KRISHA_ERROR_INVALID_PARAM;
     }
 
-    // Validate preamp (-12 dB to +12 dB)
-    if (preset->preamp_db < -12.0f || preset->preamp_db > 12.0f ||
-        preset->preamp_left_db < -12.0f || preset->preamp_left_db > 12.0f ||
-        preset->preamp_right_db < -12.0f || preset->preamp_right_db > 12.0f) {
+    // Validate preamp (-36 dB to +36 dB)
+    if (preset->preamp_db < -36.0f || preset->preamp_db > 36.0f ||
+        preset->preamp_left_db < -36.0f || preset->preamp_left_db > 36.0f ||
+        preset->preamp_right_db < -36.0f || preset->preamp_right_db > 36.0f) {
         return KRISHA_ERROR_INVALID_PARAM;
     }
 
